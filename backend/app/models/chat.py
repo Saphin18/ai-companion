@@ -1,8 +1,6 @@
 ﻿"""Request/response schemas for the chat and session APIs."""
-
 from datetime import datetime
 from uuid import UUID
-
 from pydantic import BaseModel, ConfigDict
 
 
@@ -18,7 +16,6 @@ class ChatResponse(BaseModel):
 
 class MessageOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: UUID
     role: str
     content: str
@@ -27,8 +24,14 @@ class MessageOut(BaseModel):
 
 class SessionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: UUID
     title: str | None
+    pinned: bool
     created_at: datetime
     updated_at: datetime
+
+
+class SessionUpdate(BaseModel):
+    """Body for PATCH /sessions/{id}. Both fields optional: send only what changes."""
+    title: str | None = None
+    pinned: bool | None = None

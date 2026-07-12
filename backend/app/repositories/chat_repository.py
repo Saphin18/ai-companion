@@ -1,17 +1,17 @@
-﻿"""
+"""
 Data-access layer for chat sessions and messages.
 
 Every function requires user_id and filters by it, so a user can only ever
 touch their own rows. Endpoints call these; they never write SQL directly.
 Commits are handled by the caller (the endpoint), not here.
 """
-
 import uuid
-
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.db.models import ChatMessage, ChatSession
+
+# Sentinel so callers can distinguish "leave unchanged" from "set to None".
+_UNSET = object()
 
 
 async def create_session(
@@ -41,9 +41,30 @@ async def list_sessions(db: AsyncSession, user_id: uuid.UUID) -> list[ChatSessio
             ChatSession.user_id == user_id,
             ChatSession.hidden_at.is_(None),
         )
-        .order_by(ChatSession.updated_at.desc())
+        # Pinned chats float to the top; within each group, most recent first.
+        .order_by(ChatSession.pinned.desc(), ChatSession.updated_at.desc())
     )
     return list(result.scalars().all())
+
+
+async def update_session(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    user_id: uuid.UUID,
+    *,
+    title=_UNSET,
+    pinned=_UNSET,
+) -> ChatSession | None:
+    """Rename and/or pin a session. Only the fields passed in are changed."""
+    session = await get_session(db, session_id, user_id)
+    if session is None:
+        return None
+    if title is not _UNSET:
+        session.title = title
+    if pinned is not _UNSET:
+        session.pinned = pinned
+    await db.flush()
+    return session
 
 
 async def hide_session(
