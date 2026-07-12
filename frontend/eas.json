@@ -1,0 +1,30 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://saphin-ai-backend.onrender.com",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://mlqbnmloighdifavttwx.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1scWJubWxvaWdoZGlmYXZ0dHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3ODg2MzUsImV4cCI6MjA5OTM2NDYzNX0.FncDj23SHNZG_9oH8zcyh4LIAFMk1J2oqoTgzY75HN0"
+      }
+    },
+    "production": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://saphin-ai-backend.onrender.com",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://mlqbnmloighdifavttwx.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1scWJubWxvaWdoZGlmYXZ0dHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3ODg2MzUsImV4cCI6MjA5OTM2NDYzNX0.FncDj23SHNZG_9oH8zcyh4LIAFMk1J2oqoTgzY75HN0"
+      }
+    }
+  }
+}

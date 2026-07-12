@@ -1,4 +1,4 @@
-﻿{
+{
   "expo": {
     "name": "Saphin AI",
     "slug": "saphin-ai",
@@ -27,6 +27,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e8d6e6eb-b1bf-4e21-af8b-885612a4b999"
+      }
     }
   }
 }
