@@ -1,7 +1,7 @@
 ﻿{
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "Saphin AI",
+    "slug": "saphin-ai",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,18 +10,20 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#2a2350"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.saphin.ai"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#2a2350"
       },
       "edgeToEdgeEnabled": false,
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "pan",
+      "package": "com.saphin.ai"
     },
     "web": {
       "favicon": "./assets/favicon.png"
