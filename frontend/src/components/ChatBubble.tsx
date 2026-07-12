@@ -1,16 +1,33 @@
 ﻿import { StyleSheet, Text, View } from 'react-native';
 import type { ChatMessage } from '../types/chat';
+import { useTheme } from '../context/ThemeContext';
 
 interface Props {
   message: ChatMessage;
 }
 
 export default function ChatBubble({ message }: Props) {
+  const { theme } = useTheme();
   const isUser = message.role === 'user';
+
   return (
     <View style={[styles.row, isUser ? styles.rowUser : styles.rowCompanion]}>
-      <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleCompanion]}>
-        <Text style={isUser ? styles.textUser : styles.textCompanion}>{message.text}</Text>
+      <View
+        style={[
+          styles.bubble,
+          isUser
+            ? [styles.bubbleUser, { backgroundColor: theme.bubbleUser }]
+            : [styles.bubbleCompanion, { backgroundColor: theme.bubbleCompanion }],
+        ]}
+      >
+        <Text
+          style={[
+            styles.text,
+            { color: isUser ? theme.bubbleUserText : theme.bubbleCompanionText },
+          ]}
+        >
+          {message.text}
+        </Text>
       </View>
     </View>
   );
@@ -35,20 +52,12 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   bubbleUser: {
-    backgroundColor: '#6366f1',
     borderBottomRightRadius: 4,
   },
   bubbleCompanion: {
-    backgroundColor: '#1e293b',
     borderBottomLeftRadius: 4,
   },
-  textUser: {
-    color: '#ffffff',
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  textCompanion: {
-    color: '#e2e8f0',
+  text: {
     fontSize: 15,
     lineHeight: 20,
   },

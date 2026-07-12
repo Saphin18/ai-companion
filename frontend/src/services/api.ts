@@ -6,7 +6,6 @@ async function authHeaders(): Promise<Record<string, string>> {
   let {
     data: { session },
   } = await supabase.auth.getSession();
-  // If the token is missing or about to expire, refresh before calling.
   if (!session?.access_token) {
     const refreshed = await supabase.auth.refreshSession();
     session = refreshed.data.session;
@@ -33,7 +32,13 @@ export async function sendChatMessage(
   return res.json();
 }
 
-export type ProfileData = { display_name: string | null };
+export type ThemeMode = "dark" | "light" | "system";
+
+export type ProfileData = {
+  display_name: string | null;
+  theme_preference?: ThemeMode;
+  avatar_url?: string | null;
+};
 
 export async function getProfile(): Promise<ProfileData> {
   const res = await fetch(`${API_URL}/profile`, {
@@ -43,14 +48,73 @@ export async function getProfile(): Promise<ProfileData> {
   return res.json();
 }
 
-export async function updateProfile(displayName: string): Promise<ProfileData> {
+async function patchProfile(
+  patch: Record<string, unknown>
+): Promise<ProfileData> {
   const res = await fetch(`${API_URL}/profile`, {
     method: "PUT",
     headers: await authHeaders(),
-    body: JSON.stringify({ display_name: displayName }),
+    body: JSON.stringify(patch),
   });
   if (!res.ok) throw new Error(`Profile update failed: ${res.status}`);
   return res.json();
+}
+
+export async function updateProfile(displayName: string): Promise<ProfileData> {
+  return patchProfile({ display_name: displayName });
+}
+
+export async function updateThemePreference(
+  mode: ThemeMode
+): Promise<ProfileData> {
+  return patchProfile({ theme_preference: mode });
+}
+
+export async function updateAvatarUrl(
+  url: string | null
+): Promise<ProfileData> {
+  return patchProfile({ avatar_url: url });
+}
+
+/**
+ * Upload a local image to the public "avatars" bucket under avatars/<user_id>/,
+ * save its public URL to the profile, and return that URL.
+ * Throws with a friendly message on failure.
+ */
+export async function uploadAvatar(localUri: string): Promise<string> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in.");
+
+  // Read the file into bytes (fetch on a file:// URI works in Expo).
+  let bytes: ArrayBuffer;
+  try {
+    const resp = await fetch(localUri);
+    bytes = await resp.arrayBuffer();
+  } catch {
+    throw new Error("Couldn't read the selected image.");
+  }
+
+  // One stable path per user so a new upload overwrites the old avatar.
+  const path = `${user.id}/avatar.jpg`;
+
+  const { error: upErr } = await supabase.storage
+    .from("avatars")
+    .upload(path, bytes, {
+      contentType: "image/jpeg",
+      upsert: true,
+    });
+  if (upErr) {
+    throw new Error(upErr.message || "Upload failed. Check your connection.");
+  }
+
+  // Public URL + a cache-busting query so the new image shows immediately.
+  const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+  const publicUrl = `${data.publicUrl}?v=${Date.now()}`;
+
+  await updateAvatarUrl(publicUrl);
+  return publicUrl;
 }
 
 export type SessionSummary = {

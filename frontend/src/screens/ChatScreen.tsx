@@ -1,7 +1,8 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -13,6 +14,7 @@ import ChatBubble from "../components/ChatBubble";
 import ChatInput from "../components/ChatInput";
 import { sendChatMessage, loadSessionMessages } from "../services/api";
 import { ChatMessage } from "../types/chat";
+import { useTheme } from "../context/ThemeContext";
 
 type Props = {
   sessionId: string | null;
@@ -27,10 +29,24 @@ const WELCOME: ChatMessage = {
 };
 
 export default function ChatScreen({ sessionId, onBack }: Props) {
+  const { theme } = useTheme();
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
   const [currentSession, setCurrentSession] = useState<string | null>(sessionId);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(sessionId !== null);
+
+  const listRef = useRef<FlatList<ChatMessage>>(null);
+
+  const scrollToEnd = () => {
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToEnd({ animated: true });
+    });
+  };
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", scrollToEnd);
+    return () => showSub.remove();
+  }, []);
 
   useEffect(() => {
     if (sessionId === null) {
@@ -95,49 +111,68 @@ export default function ChatScreen({ sessionId, onBack }: Props) {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color="#7c6cf0" />
+      <View style={[styles.center, { backgroundColor: theme.background }]}>
+        <ActivityIndicator color={theme.accent} />
       </View>
     );
   }
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-    >
+  const body = (
+    <>
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Text style={styles.backText}>‹ Chats</Text>
+          <Text style={[styles.backText, { color: theme.accent }]}>‹ Chats</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Companion</Text>
+        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
+          Companion
+        </Text>
         <View style={{ width: 60 }} />
       </View>
 
       <FlatList
+        ref={listRef}
         data={messages}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <ChatBubble message={item} />}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
+        onContentSizeChange={scrollToEnd}
+        onLayout={scrollToEnd}
       />
 
-      {sending && <Text style={styles.thinking}>Thinking…</Text>}
+      {sending && (
+        <Text style={[styles.thinking, { color: theme.textSecondary }]}>
+          Thinking…
+        </Text>
+      )}
 
       <ChatInput onSend={handleSend} disabled={sending} />
-    </KeyboardAvoidingView>
+    </>
+  );
+
+  // iOS: lift with padding. Android: no wrapper — the OS `resize` mode moves the
+  // input above the keyboard by itself (a second lifter here would double it up).
+  if (Platform.OS === "ios") {
+    return (
+      <KeyboardAvoidingView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        behavior="padding"
+      >
+        {body}
+      </KeyboardAvoidingView>
+    );
+  }
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {body}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0f1419" },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#0f1419",
-  },
+  container: { flex: 1 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -147,11 +182,10 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   backBtn: { padding: 4 },
-  backText: { color: "#7c6cf0", fontSize: 17 },
-  headerTitle: { color: "#fff", fontSize: 20, fontWeight: "700" },
+  backText: { fontSize: 17 },
+  headerTitle: { fontSize: 20, fontWeight: "700" },
   list: { paddingHorizontal: 16, paddingBottom: 10 },
   thinking: {
-    color: "#8b8ba7",
     paddingHorizontal: 20,
     paddingBottom: 6,
     fontStyle: "italic",

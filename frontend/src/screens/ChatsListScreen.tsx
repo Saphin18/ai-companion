@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -12,19 +13,21 @@ import {
   View,
 } from "react-native";
 import {
+  getProfile,
   listSessions,
   removeSession,
   renameSession,
   setSessionPinned,
   SessionSummary,
 } from "../services/api";
+import { supabase } from "../services/supabase";
+import { useTheme } from "../context/ThemeContext";
 
 type Props = {
   onOpenChat: (sessionId: string | null) => void;
   onOpenProfile: () => void;
 };
 
-// Pinned chats float to the top; within each group, most recent first.
 function sortSessions(list: SessionSummary[]): SessionSummary[] {
   return [...list].sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
@@ -33,12 +36,13 @@ function sortSessions(list: SessionSummary[]): SessionSummary[] {
 }
 
 export default function ChatsListScreen({ onOpenChat, onOpenProfile }: Props) {
+  const { theme } = useTheme();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [initial, setInitial] = useState("?");
 
-  // The session whose action menu is open (null = menu closed).
   const [menuFor, setMenuFor] = useState<SessionSummary | null>(null);
-  // Rename modal state.
   const [renameFor, setRenameFor] = useState<SessionSummary | null>(null);
   const [renameText, setRenameText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -52,25 +56,29 @@ export default function ChatsListScreen({ onOpenChat, onOpenProfile }: Props) {
       } finally {
         setLoading(false);
       }
+      // Load avatar + initial for the header button.
+      try {
+        const { data } = await supabase.auth.getUser();
+        const profile = await getProfile();
+        setAvatarUrl(profile.avatar_url ?? null);
+        const src = (profile.display_name || data.user?.email || "?").trim();
+        setInitial((src[0] || "?").toUpperCase());
+      } catch (e) {
+        console.warn(e);
+      }
     })();
   }, []);
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
-    return d.toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-    });
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   };
 
   const handleTogglePin = async (item: SessionSummary) => {
     setMenuFor(null);
     const next = !item.pinned;
-    // Optimistic: update + re-sort immediately, roll back if the call fails.
     setSessions((prev) =>
-      sortSessions(
-        prev.map((s) => (s.id === item.id ? { ...s, pinned: next } : s))
-      )
+      sortSessions(prev.map((s) => (s.id === item.id ? { ...s, pinned: next } : s)))
     );
     try {
       await setSessionPinned(item.id, next);
@@ -102,9 +110,7 @@ export default function ChatsListScreen({ onOpenChat, onOpenProfile }: Props) {
     try {
       await renameSession(renameFor.id, title);
       setSessions((prev) =>
-        sortSessions(
-          prev.map((s) => (s.id === renameFor.id ? { ...s, title } : s))
-        )
+        sortSessions(prev.map((s) => (s.id === renameFor.id ? { ...s, title } : s)))
       );
       setRenameFor(null);
     } catch (e) {
@@ -117,48 +123,60 @@ export default function ChatsListScreen({ onOpenChat, onOpenProfile }: Props) {
 
   const handleRemove = (item: SessionSummary) => {
     setMenuFor(null);
-    Alert.alert(
-      "Remove from list",
-      "Are you sure you want to remove this chat?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: async () => {
-            // Optimistic remove; restore on failure.
-            const prev = sessions;
-            setSessions((cur) => cur.filter((s) => s.id !== item.id));
-            try {
-              await removeSession(item.id);
-            } catch (e) {
-              console.warn(e);
-              setSessions(prev);
-              Alert.alert("Couldn't remove", "Please try again.");
-            }
-          },
+    Alert.alert("Remove from list", "Are you sure you want to remove this chat?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove",
+        style: "destructive",
+        onPress: async () => {
+          const prev = sessions;
+          setSessions((cur) => cur.filter((s) => s.id !== item.id));
+          try {
+            await removeSession(item.id);
+          } catch (e) {
+            console.warn(e);
+            setSessions(prev);
+            Alert.alert("Couldn't remove", "Please try again.");
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Your Chats</Text>
-        <TouchableOpacity onPress={onOpenProfile} style={styles.menuBtn}>
-          <Text style={styles.menuIcon}>☰</Text>
+        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
+          Your Chats
+        </Text>
+        <TouchableOpacity onPress={onOpenProfile}>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.headerAvatarImg} />
+          ) : (
+            <View style={[styles.headerAvatar, { backgroundColor: theme.accent }]}>
+              <Text style={[styles.headerAvatarText, { color: theme.accentText }]}>
+                {initial}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.newBtn} onPress={() => onOpenChat(null)}>
-        <Text style={styles.newBtnText}>+ New chat</Text>
+      <TouchableOpacity
+        style={[styles.newBtn, { backgroundColor: theme.accent }]}
+        onPress={() => onOpenChat(null)}
+      >
+        <Text style={[styles.newBtnText, { color: theme.accentText }]}>
+          + New chat
+        </Text>
       </TouchableOpacity>
 
       {loading ? (
-        <ActivityIndicator color="#7c6cf0" style={{ marginTop: 40 }} />
+        <ActivityIndicator color={theme.accent} style={{ marginTop: 40 }} />
       ) : sessions.length === 0 ? (
-        <Text style={styles.empty}>No chats yet. Start a new one above.</Text>
+        <Text style={[styles.empty, { color: theme.textSecondary }]}>
+          No chats yet. Start a new one above.
+        </Text>
       ) : (
         <FlatList
           data={sessions}
@@ -166,38 +184,49 @@ export default function ChatsListScreen({ onOpenChat, onOpenProfile }: Props) {
           contentContainerStyle={{ paddingBottom: 20 }}
           renderItem={({ item }) => (
             <TouchableOpacity
-              style={styles.row}
+              style={[styles.row, { backgroundColor: theme.surface }]}
               onPress={() => onOpenChat(item.id)}
               onLongPress={() => setMenuFor(item)}
               delayLongPress={250}
             >
               {item.pinned && <Text style={styles.pin}>📌</Text>}
-              <Text style={styles.rowTitle} numberOfLines={1}>
+              <Text
+                style={[styles.rowTitle, { color: theme.textPrimary }]}
+                numberOfLines={1}
+              >
                 {item.title || "New chat"}
               </Text>
-              <Text style={styles.rowDate}>{formatDate(item.updated_at)}</Text>
+              <Text style={[styles.rowDate, { color: theme.textSecondary }]}>
+                {formatDate(item.updated_at)}
+              </Text>
             </TouchableOpacity>
           )}
         />
       )}
 
-      {/* Action menu (long-press): Pin / Rename / Remove */}
+      {/* Action menu */}
       <Modal
         visible={menuFor !== null}
         transparent
         animationType="fade"
         onRequestClose={() => setMenuFor(null)}
       >
-        <Pressable style={styles.overlay} onPress={() => setMenuFor(null)}>
-          <Pressable style={styles.sheet}>
-            <Text style={styles.sheetTitle} numberOfLines={1}>
+        <Pressable
+          style={[styles.overlay, { backgroundColor: theme.overlay }]}
+          onPress={() => setMenuFor(null)}
+        >
+          <Pressable style={[styles.sheet, { backgroundColor: theme.surface }]}>
+            <Text
+              style={[styles.sheetTitle, { color: theme.textSecondary }]}
+              numberOfLines={1}
+            >
               {menuFor?.title || "New chat"}
             </Text>
             <TouchableOpacity
               style={styles.sheetItem}
               onPress={() => menuFor && handleTogglePin(menuFor)}
             >
-              <Text style={styles.sheetText}>
+              <Text style={[styles.sheetText, { color: theme.textPrimary }]}>
                 {menuFor?.pinned ? "📌  Unpin" : "📌  Pin"}
               </Text>
             </TouchableOpacity>
@@ -205,21 +234,25 @@ export default function ChatsListScreen({ onOpenChat, onOpenProfile }: Props) {
               style={styles.sheetItem}
               onPress={() => menuFor && openRename(menuFor)}
             >
-              <Text style={styles.sheetText}>✏️  Rename</Text>
+              <Text style={[styles.sheetText, { color: theme.textPrimary }]}>
+                ✏️  Rename
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.sheetItem}
               onPress={() => menuFor && handleRemove(menuFor)}
             >
-              <Text style={[styles.sheetText, styles.danger]}>
+              <Text style={[styles.sheetText, { color: theme.danger }]}>
                 🗑  Remove from list
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.sheetCancel}
+              style={[styles.sheetCancel, { borderTopColor: theme.border }]}
               onPress={() => setMenuFor(null)}
             >
-              <Text style={styles.sheetCancelText}>Cancel</Text>
+              <Text style={[styles.sheetCancelText, { color: theme.textSecondary }]}>
+                Cancel
+              </Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -232,15 +265,23 @@ export default function ChatsListScreen({ onOpenChat, onOpenProfile }: Props) {
         animationType="fade"
         onRequestClose={() => setRenameFor(null)}
       >
-        <Pressable style={styles.overlay} onPress={() => setRenameFor(null)}>
-          <Pressable style={styles.renameBox}>
-            <Text style={styles.renameTitle}>Rename chat</Text>
+        <Pressable
+          style={[styles.overlay, { backgroundColor: theme.overlay }]}
+          onPress={() => setRenameFor(null)}
+        >
+          <Pressable style={[styles.renameBox, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.renameTitle, { color: theme.textPrimary }]}>
+              Rename chat
+            </Text>
             <TextInput
-              style={styles.renameInput}
+              style={[
+                styles.renameInput,
+                { backgroundColor: theme.surfaceAlt, color: theme.textPrimary },
+              ]}
               value={renameText}
               onChangeText={setRenameText}
               placeholder="Chat name"
-              placeholderTextColor="#8b8ba7"
+              placeholderTextColor={theme.textSecondary}
               autoFocus
               returnKeyType="done"
               onSubmitEditing={submitRename}
@@ -251,17 +292,21 @@ export default function ChatsListScreen({ onOpenChat, onOpenProfile }: Props) {
                 style={styles.renameCancel}
                 onPress={() => setRenameFor(null)}
               >
-                <Text style={styles.renameCancelText}>Cancel</Text>
+                <Text style={[styles.renameCancelText, { color: theme.textSecondary }]}>
+                  Cancel
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.renameSave}
+                style={[styles.renameSave, { backgroundColor: theme.accent }]}
                 onPress={submitRename}
                 disabled={busy}
               >
                 {busy ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={theme.accentText} />
                 ) : (
-                  <Text style={styles.renameSaveText}>Save</Text>
+                  <Text style={[styles.renameSaveText, { color: theme.accentText }]}>
+                    Save
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -273,7 +318,7 @@ export default function ChatsListScreen({ onOpenChat, onOpenProfile }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0f1419", paddingTop: 56 },
+  container: { flex: 1, paddingTop: 56 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -281,87 +326,59 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 16,
   },
-  headerTitle: { color: "#fff", fontSize: 24, fontWeight: "700" },
-  menuBtn: { padding: 6 },
-  menuIcon: { color: "#fff", fontSize: 24 },
+  headerTitle: { fontSize: 24, fontWeight: "700" },
+  headerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerAvatarText: { fontSize: 18, fontWeight: "700" },
+  headerAvatarImg: { width: 40, height: 40, borderRadius: 20 },
+
   newBtn: {
-    backgroundColor: "#7c6cf0",
     marginHorizontal: 20,
     borderRadius: 14,
     padding: 15,
     alignItems: "center",
     marginBottom: 20,
   },
-  newBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  empty: { color: "#8b8ba7", textAlign: "center", marginTop: 40, fontSize: 15 },
+  newBtnText: { fontSize: 16, fontWeight: "700" },
+  empty: { textAlign: "center", marginTop: 40, fontSize: 15 },
   row: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#1a2230",
     marginHorizontal: 20,
     marginBottom: 10,
     borderRadius: 14,
     padding: 16,
   },
   pin: { fontSize: 13, marginRight: 8 },
-  rowTitle: { color: "#fff", fontSize: 16, flex: 1, marginRight: 10 },
-  rowDate: { color: "#8b8ba7", fontSize: 13 },
+  rowTitle: { fontSize: 16, flex: 1, marginRight: 10 },
+  rowDate: { fontSize: 13 },
 
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    justifyContent: "center",
-    padding: 28,
-  },
-  sheet: {
-    backgroundColor: "#1a2230",
-    borderRadius: 18,
-    paddingVertical: 8,
-    overflow: "hidden",
-  },
-  sheetTitle: {
-    color: "#8b8ba7",
-    fontSize: 13,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 6,
-  },
+  overlay: { flex: 1, justifyContent: "center", padding: 28 },
+  sheet: { borderRadius: 18, paddingVertical: 8, overflow: "hidden" },
+  sheetTitle: { fontSize: 13, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 6 },
   sheetItem: { paddingVertical: 15, paddingHorizontal: 20 },
-  sheetText: { color: "#fff", fontSize: 16 },
-  danger: { color: "#ff6b6b" },
+  sheetText: { fontSize: 16 },
   sheetCancel: {
     paddingVertical: 15,
     paddingHorizontal: 20,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(255,255,255,0.1)",
     marginTop: 4,
   },
-  sheetCancelText: { color: "#8b8ba7", fontSize: 16, textAlign: "center" },
+  sheetCancelText: { fontSize: 16, textAlign: "center" },
 
-  renameBox: { backgroundColor: "#1a2230", borderRadius: 18, padding: 20 },
-  renameTitle: {
-    color: "#fff",
-    fontSize: 17,
-    fontWeight: "600",
-    marginBottom: 14,
-  },
-  renameInput: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    color: "#fff",
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-  },
-  renameActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginTop: 16,
-  },
+  renameBox: { borderRadius: 18, padding: 20 },
+  renameTitle: { fontSize: 17, fontWeight: "600", marginBottom: 14 },
+  renameInput: { borderRadius: 12, padding: 14, fontSize: 16 },
+  renameActions: { flexDirection: "row", justifyContent: "flex-end", marginTop: 16 },
   renameCancel: { paddingVertical: 10, paddingHorizontal: 16 },
-  renameCancelText: { color: "#8b8ba7", fontSize: 15, fontWeight: "600" },
+  renameCancelText: { fontSize: 15, fontWeight: "600" },
   renameSave: {
-    backgroundColor: "#7c6cf0",
     borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 22,
@@ -369,5 +386,5 @@ const styles = StyleSheet.create({
     minWidth: 84,
     alignItems: "center",
   },
-  renameSaveText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  renameSaveText: { fontSize: 15, fontWeight: "700" },
 });

@@ -1,5 +1,13 @@
 ﻿import { useState } from 'react';
-import { StyleSheet, TextInput, TouchableOpacity, Text, View } from 'react-native';
+import {
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 interface Props {
   onSend: (text: string) => void;
@@ -7,6 +15,7 @@ interface Props {
 }
 
 export default function ChatInput({ onSend, disabled }: Props) {
+  const { theme } = useTheme();
   const [text, setText] = useState('');
 
   const handleSend = () => {
@@ -16,23 +25,43 @@ export default function ChatInput({ onSend, disabled }: Props) {
     setText('');
   };
 
+  const canSend = !disabled && !!text.trim();
+
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: theme.surface, borderTopColor: theme.border },
+      ]}
+    >
       <TextInput
-        style={styles.input}
+        style={[
+          styles.input,
+          { backgroundColor: theme.surfaceAlt, color: theme.textPrimary },
+        ]}
         value={text}
         onChangeText={setText}
         placeholder="Type a message..."
-        placeholderTextColor="#64748b"
+        placeholderTextColor={theme.textSecondary}
         multiline
         editable={!disabled}
       />
       <TouchableOpacity
-        style={[styles.sendButton, (disabled || !text.trim()) && styles.sendButtonDisabled]}
+        style={[
+          styles.sendButton,
+          { backgroundColor: canSend ? theme.accent : theme.surfaceAlt },
+        ]}
         onPress={handleSend}
-        disabled={disabled || !text.trim()}
+        disabled={!canSend}
       >
-        <Text style={styles.sendText}>Send</Text>
+        <Text
+          style={[
+            styles.sendText,
+            { color: canSend ? theme.accentText : theme.textSecondary },
+          ]}
+        >
+          Send
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -43,34 +72,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: '#0f172a',
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 16,
     borderTopWidth: 1,
-    borderTopColor: '#1e293b',
   },
   input: {
     flex: 1,
-    backgroundColor: '#1e293b',
-    color: '#f8fafc',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 12,
     fontSize: 15,
-    maxHeight: 100,
-    marginRight: 8,
+    minHeight: 48,
+    maxHeight: 120,
+    marginRight: 10,
   },
   sendButton: {
-    backgroundColor: '#6366f1',
-    borderRadius: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-  },
-  sendButtonDisabled: {
-    backgroundColor: '#334155',
+    borderRadius: 24,
+    paddingHorizontal: 22,
+    minHeight: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sendText: {
-    color: '#ffffff',
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 15,
   },
 });
