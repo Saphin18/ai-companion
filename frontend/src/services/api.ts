@@ -1,4 +1,4 @@
-﻿import { supabase } from "./supabase";
+import { supabase } from "./supabase";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL as string;
 
@@ -6,13 +6,11 @@ async function authHeaders(): Promise<Record<string, string>> {
   let {
     data: { session },
   } = await supabase.auth.getSession();
-
   // If the token is missing or about to expire, refresh before calling.
   if (!session?.access_token) {
     const refreshed = await supabase.auth.refreshSession();
     session = refreshed.data.session;
   }
-
   const token = session?.access_token;
   return {
     "Content-Type": "application/json",
@@ -58,6 +56,7 @@ export async function updateProfile(displayName: string): Promise<ProfileData> {
 export type SessionSummary = {
   id: string;
   title: string | null;
+  pinned: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -84,6 +83,32 @@ export async function loadSessionMessages(
     headers: await authHeaders(),
   });
   if (!res.ok) throw new Error(`Messages load failed: ${res.status}`);
+  return res.json();
+}
+
+export async function renameSession(
+  sessionId: string,
+  title: string
+): Promise<SessionSummary> {
+  const res = await fetch(`${API_URL}/sessions/${sessionId}`, {
+    method: "PATCH",
+    headers: await authHeaders(),
+    body: JSON.stringify({ title }),
+  });
+  if (!res.ok) throw new Error(`Rename failed: ${res.status}`);
+  return res.json();
+}
+
+export async function setSessionPinned(
+  sessionId: string,
+  pinned: boolean
+): Promise<SessionSummary> {
+  const res = await fetch(`${API_URL}/sessions/${sessionId}`, {
+    method: "PATCH",
+    headers: await authHeaders(),
+    body: JSON.stringify({ pinned }),
+  });
+  if (!res.ok) throw new Error(`Pin failed: ${res.status}`);
   return res.json();
 }
 

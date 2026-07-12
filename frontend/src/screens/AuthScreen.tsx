@@ -18,11 +18,14 @@ import { updateProfile } from "../services/api";
 export default function AuthScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const passwordRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
 
   const fade = useRef(new Animated.Value(0)).current;
@@ -43,6 +46,8 @@ export default function AuthScreen() {
       useNativeDriver: true,
     }).start(() => {
       setIsSignUp((prev) => !prev);
+      // Clear the confirm field when switching modes so a stale value never blocks login.
+      setConfirmPassword("");
       modeAnim.setValue(-1);
       Animated.timing(modeAnim, {
         toValue: 0,
@@ -70,14 +75,36 @@ export default function AuthScreen() {
       Alert.alert("Missing info", "Please enter your full name.");
       return;
     }
+    if (isSignUp && password.length < 6) {
+      Alert.alert("Weak password", "Password must be at least 6 characters.");
+      return;
+    }
+    if (isSignUp && password !== confirmPassword) {
+      Alert.alert(
+        "Passwords don't match",
+        "Please make sure both passwords are the same."
+      );
+      return;
+    }
     setLoading(true);
     try {
-      if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+     if (isSignUp) {
+        const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
         });
         if (error) throw error;
+        // Supabase hides "email exists" for security: it returns success with an
+        // empty identities array and sends no email. Detect that and tell the user.
+        if (data.user && data.user.identities && data.user.identities.length === 0) {
+          Alert.alert(
+            "Email already registered",
+            "This email is already in use. Please log in instead."
+          );
+          setIsSignUp(false);
+          setConfirmPassword("");
+          return;
+        }
         try {
           await updateProfile(fullName.trim());
         } catch {
@@ -88,6 +115,7 @@ export default function AuthScreen() {
           "We sent you a confirmation link. Confirm, then log in."
         );
         setIsSignUp(false);
+        setConfirmPassword("");
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
@@ -166,17 +194,55 @@ export default function AuthScreen() {
               onSubmitEditing={() => passwordRef.current?.focus()}
               blurOnSubmit={false}
             />
-            <TextInput
-              ref={passwordRef}
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password"
-              placeholderTextColor="#8b8ba7"
-              secureTextEntry
-              returnKeyType="done"
-              onSubmitEditing={handleSubmit}
-            />
+
+            <View style={styles.passwordRow}>
+              <TextInput
+                ref={passwordRef}
+                style={styles.passwordInput}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Password"
+                placeholderTextColor="#8b8ba7"
+                secureTextEntry={!showPassword}
+                returnKeyType={isSignUp ? "next" : "done"}
+                onSubmitEditing={() =>
+                  isSignUp ? confirmRef.current?.focus() : handleSubmit()
+                }
+                blurOnSubmit={!isSignUp}
+              />
+              <TouchableOpacity
+                style={styles.toggle}
+                onPress={() => setShowPassword((v) => !v)}
+              >
+                <Text style={styles.toggleText}>
+                  {showPassword ? "Hide" : "Show"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {isSignUp && (
+              <View style={styles.passwordRow}>
+                <TextInput
+                  ref={confirmRef}
+                  style={styles.passwordInput}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="Confirm password"
+                  placeholderTextColor="#8b8ba7"
+                  secureTextEntry={!showPassword}
+                  returnKeyType="done"
+                  onSubmitEditing={handleSubmit}
+                />
+                <TouchableOpacity
+                  style={styles.toggle}
+                  onPress={() => setShowPassword((v) => !v)}
+                >
+                  <Text style={styles.toggleText}>
+                    {showPassword ? "Hide" : "Show"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <TouchableOpacity
               style={styles.button}
@@ -251,6 +317,29 @@ const styles = StyleSheet.create({
     padding: 15,
     fontSize: 16,
     marginBottom: 14,
+  },
+  passwordRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 14,
+    marginBottom: 14,
+    paddingRight: 6,
+  },
+  passwordInput: {
+    flex: 1,
+    color: "#fff",
+    padding: 15,
+    fontSize: 16,
+  },
+  toggle: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  toggleText: {
+    color: "#a99cf5",
+    fontSize: 14,
+    fontWeight: "600",
   },
   button: {
     backgroundColor: "#7c6cf0",
