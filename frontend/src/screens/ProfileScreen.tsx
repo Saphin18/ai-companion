@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 import { supabase } from "../services/supabase";
-import { getProfile, updateProfile } from "../services/api";
+import { deleteAccount, getProfile, updateProfile } from "../services/api";
 
 type Props = {
   onClose: () => void;
@@ -20,6 +20,7 @@ export default function ProfileScreen({ onClose }: Props) {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -50,6 +51,50 @@ export default function ProfileScreen({ onClose }: Props) {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+  };
+
+  // Permanent deletion: two confirmations so it can't happen by accident.
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete account",
+      "This permanently deletes your account. Are you sure?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Continue",
+          style: "destructive",
+          onPress: confirmDeleteAccount,
+        },
+      ]
+    );
+  };
+
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      "This can't be undone",
+      "Your account will be permanently deleted and you'll be signed out. Delete forever?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete forever",
+          style: "destructive",
+          onPress: doDeleteAccount,
+        },
+      ]
+    );
+  };
+
+  const doDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await deleteAccount();
+      // Sign out locally; App will drop back to the auth screen.
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn(e);
+      Alert.alert("Error", "Could not delete your account. Please try again.");
+      setDeleting(false);
+    }
   };
 
   if (loading) {
@@ -95,6 +140,18 @@ export default function ProfileScreen({ onClose }: Props) {
       <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
         <Text style={styles.logoutText}>Log out</Text>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.deleteBtn}
+        onPress={handleDeleteAccount}
+        disabled={deleting}
+      >
+        {deleting ? (
+          <ActivityIndicator color="#ef4444" />
+        ) : (
+          <Text style={styles.deleteText}>Delete account</Text>
+        )}
+      </TouchableOpacity>
     </View>
   );
 }
@@ -112,4 +169,13 @@ const styles = StyleSheet.create({
   primaryText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   logoutBtn: { borderRadius: 12, padding: 16, alignItems: "center", marginTop: 14 },
   logoutText: { color: "#ef4444", fontSize: 16, fontWeight: "600" },
+  deleteBtn: {
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: "#ef4444",
+  },
+  deleteText: { color: "#ef4444", fontSize: 15, fontWeight: "700" },
 });

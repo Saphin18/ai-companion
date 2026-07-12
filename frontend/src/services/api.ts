@@ -121,3 +121,13 @@ export async function removeSession(sessionId: string): Promise<void> {
     throw new Error(`Remove failed: ${res.status}`);
   }
 }
+
+export async function deleteAccount(): Promise<void> {
+  const res = await fetch(`${API_URL}/account`, {
+    method: "DELETE",
+    headers: await authHeaders(),
+  });
+  if (!res.ok && res.status !== 204) {
+    throw new Error(`Delete account failed: ${res.status}`);
+  }
+}

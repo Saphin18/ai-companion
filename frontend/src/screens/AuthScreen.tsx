@@ -89,9 +89,10 @@ export default function AuthScreen() {
     setLoading(true);
     try {
      if (isSignUp) {
-        const { data, error } = await supabase.auth.signUp({
+       const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
+          options: { data: { full_name: fullName.trim() } },
         });
         if (error) throw error;
         // Supabase hides "email exists" for security: it returns success with an
