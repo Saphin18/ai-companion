@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -119,7 +119,7 @@ export default function ChatsListScreen({ onOpenChat, onOpenProfile }: Props) {
     setMenuFor(null);
     Alert.alert(
       "Remove from list",
-      "This hides the chat from your list. It won't appear here anymore.",
+      "Are you sure you want to remove this chat?",
       [
         { text: "Cancel", style: "cancel" },
         {
