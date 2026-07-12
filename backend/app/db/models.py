@@ -59,6 +59,10 @@ class Profile(Base):
     __tablename__ = "profiles"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     display_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    theme_preference: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="system"
+    )
+    avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
