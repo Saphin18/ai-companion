@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,10 +13,9 @@ import { getProfile, updateProfile } from "../services/api";
 
 type Props = {
   onClose: () => void;
-  onClearChat: () => void;
 };
 
-export default function ProfileScreen({ onClose, onClearChat }: Props) {
+export default function ProfileScreen({ onClose }: Props) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(true);
@@ -51,17 +50,6 @@ export default function ProfileScreen({ onClose, onClearChat }: Props) {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-  };
-
-  const handleClearChat = () => {
-    Alert.alert(
-      "Clear chat view",
-      "This clears the conversation from this screen. Your account stays logged in.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Clear", style: "destructive", onPress: onClearChat },
-      ]
-    );
   };
 
   if (loading) {
@@ -104,10 +92,6 @@ export default function ProfileScreen({ onClose, onClearChat }: Props) {
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.secondaryBtn} onPress={handleClearChat}>
-        <Text style={styles.secondaryText}>Clear chat view</Text>
-      </TouchableOpacity>
-
       <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
         <Text style={styles.logoutText}>Log out</Text>
       </TouchableOpacity>
@@ -126,8 +110,6 @@ const styles = StyleSheet.create({
   readonly: { color: "#e5e7eb", fontSize: 16, paddingVertical: 4 },
   primaryBtn: { backgroundColor: "#7c6cf0", borderRadius: 12, padding: 16, alignItems: "center", marginTop: 28 },
   primaryText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  secondaryBtn: { borderColor: "#374151", borderWidth: 1, borderRadius: 12, padding: 16, alignItems: "center", marginTop: 14 },
-  secondaryText: { color: "#e5e7eb", fontSize: 16, fontWeight: "600" },
   logoutBtn: { borderRadius: 12, padding: 16, alignItems: "center", marginTop: 14 },
   logoutText: { color: "#ef4444", fontSize: 16, fontWeight: "600" },
 });
