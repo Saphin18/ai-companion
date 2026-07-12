@@ -18,7 +18,9 @@ async def read_profile(
     db: AsyncSession = Depends(get_db),
 ) -> ProfileOut:
     profile = await repo.get_profile(db, user_id)
-    return ProfileOut(display_name=profile.display_name if profile else None)
+    if profile is None:
+        return ProfileOut()
+    return ProfileOut.model_validate(profile)
 
 
 @router.put("/profile", response_model=ProfileOut)
@@ -27,9 +29,14 @@ async def update_profile(
     user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> ProfileOut:
-    profile = await repo.upsert_profile(db, user_id, payload.display_name.strip())
+    # Only the fields the client actually sent get updated (partial update).
+    changes = payload.model_dump(exclude_unset=True)
+    if changes.get("display_name") is not None:
+        changes["display_name"] = changes["display_name"].strip()
+    profile = await repo.update_profile_fields(db, user_id, changes)
     await db.commit()
-    return ProfileOut(display_name=profile.display_name)
+    await db.refresh(profile)
+    return ProfileOut.model_validate(profile)
 
 
 @router.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
@@ -38,7 +45,6 @@ async def delete_account(
 ) -> None:
     """
     Permanently delete the caller's Supabase auth account.
-
     This frees the email for reuse (a re-signup starts fresh). Chat data in
     our own tables is keyed by a plain user_id column with no FK to auth.users,
     so it is intentionally left in the database and NOT deleted.
@@ -61,7 +67,6 @@ async def delete_account(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Could not reach the auth service.",
         )
-    # 200 or 204 both mean the user was deleted.
     if resp.status_code not in (200, 204):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
