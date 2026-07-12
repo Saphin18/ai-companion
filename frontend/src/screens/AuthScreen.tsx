@@ -1,6 +1,8 @@
-﻿import { useState } from 'react';
+﻿import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -8,138 +10,260 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { supabase } from '../services/supabase';
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { supabase } from "../services/supabase";
+import { updateProfile } from "../services/api";
 
 export default function AuthScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  const passwordRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+
+  const fade = useRef(new Animated.Value(0)).current;
+  const slide = useRef(new Animated.Value(30)).current;
+  const modeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fade, { toValue: 1, duration: 900, useNativeDriver: true }),
+      Animated.timing(slide, { toValue: 0, duration: 900, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  const switchMode = () => {
+    Animated.timing(modeAnim, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsSignUp((prev) => !prev);
+      modeAnim.setValue(-1);
+      Animated.timing(modeAnim, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }).start();
+    });
+  };
+
+  const modeTranslate = modeAnim.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: [40, 0, -40],
+  });
+  const modeOpacity = modeAnim.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: [0, 1, 0],
+  });
 
   const handleSubmit = async () => {
-    setError(null);
     if (!email.trim() || !password) {
-      setError('Please enter an email and password.');
+      Alert.alert("Missing info", "Please enter your email and password.");
+      return;
+    }
+    if (isSignUp && !fullName.trim()) {
+      Alert.alert("Missing info", "Please enter your full name.");
       return;
     }
     setLoading(true);
     try {
-      const { error: authError } = isSignUp
-        ? await supabase.auth.signUp({ email: email.trim(), password })
-        : await supabase.auth.signInWithPassword({ email: email.trim(), password });
-
-      if (authError) {
-        setError(authError.message);
-      } else if (isSignUp) {
-        setError('Account created! Check your email to confirm, then log in.');
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+        });
+        if (error) throw error;
+        try {
+          await updateProfile(fullName.trim());
+        } catch {
+          // No session yet if email confirmation is on; name re-saves on first login.
+        }
+        Alert.alert(
+          "Check your email",
+          "We sent you a confirmation link. Confirm, then log in."
+        );
+        setIsSignUp(false);
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        if (error) throw error;
       }
-    } catch {
-      setError('Something went wrong. Please try again.');
+    } catch (e: any) {
+      Alert.alert("Error", e.message ?? "Something went wrong.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    <LinearGradient
+      colors={["#2a2350", "#3b2f63", "#1a1730"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.gradient}
     >
-      <Text style={styles.title}>Your Companion</Text>
-      <Text style={styles.subtitle}>
-        {isSignUp ? 'Create an account to begin.' : 'Welcome back.'}
-      </Text>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.flex}
+      >
+        <Animated.View
+          style={[
+            styles.container,
+            { opacity: fade, transform: [{ translateY: slide }] },
+          ]}
+        >
+          <View style={styles.brand}>
+            <View style={styles.orb} />
+            <Text style={styles.appName}>Your Companion</Text>
+            <Text style={styles.tagline}>
+              A warm space to talk, whenever you need it.
+            </Text>
+          </View>
 
-      <TextInput
-        style={styles.input}
-        value={email}
-        onChangeText={setEmail}
-        placeholder="Email"
-        placeholderTextColor="#64748b"
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
-      <TextInput
-        style={styles.input}
-        value={password}
-        onChangeText={setPassword}
-        placeholder="Password (min 8 characters)"
-        placeholderTextColor="#64748b"
-        secureTextEntry
-      />
+          <Animated.View
+            style={[
+              styles.card,
+              {
+                opacity: modeOpacity,
+                transform: [{ translateY: modeTranslate }],
+              },
+            ]}
+          >
+            <Text style={styles.cardTitle}>
+              {isSignUp ? "Create your account" : "Welcome back"}
+            </Text>
 
-      {error && <Text style={styles.error}>{error}</Text>}
+            {isSignUp && (
+              <TextInput
+                style={styles.input}
+                value={fullName}
+                onChangeText={setFullName}
+                placeholder="Full name"
+                placeholderTextColor="#8b8ba7"
+                autoCapitalize="words"
+                returnKeyType="next"
+                onSubmitEditing={() => emailRef.current?.focus()}
+              />
+            )}
 
-      <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
-        {loading ? (
-          <ActivityIndicator color="#ffffff" />
-        ) : (
-          <Text style={styles.buttonText}>{isSignUp ? 'Sign Up' : 'Log In'}</Text>
-        )}
-      </TouchableOpacity>
+            <TextInput
+              ref={emailRef}
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="Email"
+              placeholderTextColor="#8b8ba7"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              blurOnSubmit={false}
+            />
+            <TextInput
+              ref={passwordRef}
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Password"
+              placeholderTextColor="#8b8ba7"
+              secureTextEntry
+              returnKeyType="done"
+              onSubmitEditing={handleSubmit}
+            />
 
-      <TouchableOpacity onPress={() => setIsSignUp((prev) => !prev)}>
-        <Text style={styles.switchText}>
-          {isSignUp ? 'Already have an account? Log in' : "Don't have an account? Sign up"}
-        </Text>
-      </TouchableOpacity>
-    </KeyboardAvoidingView>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>
+                  {isSignUp ? "Sign up" : "Log in"}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={switchMode}>
+              <Text style={styles.switchText}>
+                {isSignUp
+                  ? "Already have an account? Log in"
+                  : "New here? Create an account"}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-    justifyContent: 'center',
-    paddingHorizontal: 28,
+  gradient: { flex: 1 },
+  flex: { flex: 1 },
+  container: { flex: 1, justifyContent: "center", padding: 28 },
+  brand: { alignItems: "center", marginBottom: 36 },
+  orb: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#a99cf5",
+    marginBottom: 18,
+    shadowColor: "#a99cf5",
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 0 },
   },
-  title: {
-    color: '#f8fafc',
-    fontSize: 28,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  subtitle: {
-    color: '#94a3b8',
+  appName: { color: "#fff", fontSize: 28, fontWeight: "700" },
+  tagline: {
+    color: "#c9c6e0",
     fontSize: 15,
-    textAlign: 'center',
-    marginBottom: 32,
+    marginTop: 8,
+    textAlign: "center",
+    paddingHorizontal: 20,
+  },
+  card: {
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderRadius: 22,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  cardTitle: {
+    color: "#fff",
+    fontSize: 19,
+    fontWeight: "600",
+    marginBottom: 20,
+    textAlign: "center",
   },
   input: {
-    backgroundColor: '#1e293b',
-    color: '#f8fafc',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    marginBottom: 12,
-  },
-  error: {
-    color: '#f87171',
-    fontSize: 13,
-    marginBottom: 12,
-    textAlign: 'center',
+    backgroundColor: "rgba(255,255,255,0.1)",
+    color: "#fff",
+    borderRadius: 14,
+    padding: 15,
+    fontSize: 16,
+    marginBottom: 14,
   },
   button: {
-    backgroundColor: '#6366f1',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 8,
+    backgroundColor: "#7c6cf0",
+    borderRadius: 14,
+    padding: 16,
+    alignItems: "center",
+    marginTop: 6,
   },
-  buttonText: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 15,
-  },
+  buttonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   switchText: {
-    color: '#94a3b8',
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 20,
+    color: "#c9c6e0",
+    textAlign: "center",
+    marginTop: 18,
+    fontSize: 14,
   },
 });
