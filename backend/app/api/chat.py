@@ -37,8 +37,10 @@ async def chat(
     reply = await provider.generate_reply(payload.message)
     await repo.add_message(db, session.id, user_id, "assistant", reply)
     await repo.touch_session(db, session.id)
+    # Capture the id before commit so we never read an expired attribute.
+    session_id = session.id
     await db.commit()
-    return ChatResponse(reply=reply, session_id=session.id)
+    return ChatResponse(reply=reply, session_id=session_id)
 
 
 @router.get("/sessions", response_model=list[SessionOut])
@@ -82,8 +84,12 @@ async def update_session_endpoint(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
         )
+    # Build the response WHILE the object is still live (after flush, before
+    # commit). Committing first would expire the object and reading its fields
+    # would raise in async context -> 500.
+    result = SessionOut.model_validate(session)
     await db.commit()
-    return session
+    return result
 
 
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
