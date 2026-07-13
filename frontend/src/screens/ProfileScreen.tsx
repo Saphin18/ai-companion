@@ -21,6 +21,10 @@ import {
 } from "../services/api";
 import { useTheme, ThemeMode } from "../context/ThemeContext";
 
+// Same reset page the login screen uses (backend-hosted).
+const RESET_REDIRECT_URL =
+  "https://saphin-ai-backend.onrender.com/reset-password";
+
 type Props = {
   onClose: () => void;
 };
@@ -38,6 +42,15 @@ export default function ProfileScreen({ onClose }: Props) {
 
   const [deleteStep, setDeleteStep] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Change-password dialog state
+  const [pwOpen, setPwOpen] = useState(false);
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [changingPw, setChangingPw] = useState(false);
+  const [sendingReset, setSendingReset] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -76,6 +89,87 @@ export default function ProfileScreen({ onClose }: Props) {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+  };
+
+  const openPwDialog = () => {
+    setCurrentPw("");
+    setNewPw("");
+    setConfirmPw("");
+    setShowPw(false);
+    setPwOpen(true);
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPw || !newPw || !confirmPw) {
+      Alert.alert("Missing info", "Please fill in all three password fields.");
+      return;
+    }
+    if (newPw.length < 6) {
+      Alert.alert("Weak password", "New password must be at least 6 characters.");
+      return;
+    }
+    if (newPw !== confirmPw) {
+      Alert.alert("Passwords don't match", "The new passwords don't match.");
+      return;
+    }
+    if (newPw === currentPw) {
+      Alert.alert(
+        "Choose a different password",
+        "Your new password must be different from your current one."
+      );
+      return;
+    }
+    setChangingPw(true);
+    try {
+      // 1) Verify the current password by re-authenticating with it.
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: currentPw,
+      });
+      if (signInError) {
+        Alert.alert(
+          "Wrong current password",
+          "Your current password is incorrect. If you've forgotten it, tap “Forgot password?”."
+        );
+        setChangingPw(false);
+        return;
+      }
+      // 2) Update to the new password.
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPw,
+      });
+      if (updateError) throw updateError;
+
+      setPwOpen(false);
+      Alert.alert("Password changed", "Your password has been updated.");
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not change your password.");
+    } finally {
+      setChangingPw(false);
+    }
+  };
+
+  const handleForgotFromProfile = async () => {
+    if (!email.trim()) {
+      Alert.alert("No email", "We couldn't find your account email.");
+      return;
+    }
+    setSendingReset(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: RESET_REDIRECT_URL,
+      });
+      if (error) throw error;
+      setPwOpen(false);
+      Alert.alert(
+        "Check your email",
+        "We sent a link to reset your password to " + email.trim() + "."
+      );
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not send the reset email.");
+    } finally {
+      setSendingReset(false);
+    }
   };
 
   const doDeleteAccount = async () => {
@@ -260,6 +354,15 @@ export default function ProfileScreen({ onClose }: Props) {
         </Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={[styles.secondaryBtn, { borderColor: theme.border }]}
+        onPress={openPwDialog}
+      >
+        <Text style={[styles.secondaryText, { color: theme.textPrimary }]}>
+          Change password
+        </Text>
+      </TouchableOpacity>
+
       <View style={[styles.divider, { backgroundColor: theme.border }]} />
       <Text style={[styles.dangerZone, { color: theme.textSecondary }]}>
         DANGER ZONE
@@ -326,6 +429,105 @@ export default function ProfileScreen({ onClose }: Props) {
                 Cancel
               </Text>
             </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Change password dialog */}
+      <Modal
+        visible={pwOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !changingPw && setPwOpen(false)}
+      >
+        <Pressable
+          style={[styles.overlay, { backgroundColor: theme.overlay }]}
+          onPress={() => !changingPw && setPwOpen(false)}
+        >
+          <Pressable style={[styles.dialog, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.dialogTitle, { color: theme.textPrimary }]}>
+              Change password
+            </Text>
+
+            <TextInput
+              style={[
+                styles.pwInput,
+                { backgroundColor: theme.surfaceAlt, color: theme.textPrimary },
+              ]}
+              value={currentPw}
+              onChangeText={setCurrentPw}
+              placeholder="Current password"
+              placeholderTextColor={theme.textSecondary}
+              secureTextEntry={!showPw}
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={[
+                styles.pwInput,
+                { backgroundColor: theme.surfaceAlt, color: theme.textPrimary },
+              ]}
+              value={newPw}
+              onChangeText={setNewPw}
+              placeholder="New password (min 6 chars)"
+              placeholderTextColor={theme.textSecondary}
+              secureTextEntry={!showPw}
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={[
+                styles.pwInput,
+                { backgroundColor: theme.surfaceAlt, color: theme.textPrimary },
+              ]}
+              value={confirmPw}
+              onChangeText={setConfirmPw}
+              placeholder="Confirm new password"
+              placeholderTextColor={theme.textSecondary}
+              secureTextEntry={!showPw}
+              autoCapitalize="none"
+            />
+
+            <View style={styles.pwUtilityRow}>
+              <TouchableOpacity onPress={() => setShowPw((v) => !v)}>
+                <Text style={[styles.pwUtilityText, { color: theme.textSecondary }]}>
+                  {showPw ? "Hide" : "Show"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleForgotFromProfile}
+                disabled={sendingReset}
+              >
+                <Text style={[styles.pwUtilityText, { color: theme.accent }]}>
+                  {sendingReset ? "Sending..." : "Forgot password?"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.dialogActions}>
+              <TouchableOpacity
+                style={[styles.dialogCancel, { borderColor: theme.border }]}
+                onPress={() => setPwOpen(false)}
+                disabled={changingPw}
+              >
+                <Text style={[styles.dialogCancelText, { color: theme.textPrimary }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dialogConfirm, { backgroundColor: theme.accent }]}
+                onPress={handleChangePassword}
+                disabled={changingPw}
+              >
+                {changingPw ? (
+                  <ActivityIndicator color={theme.accentText} />
+                ) : (
+                  <Text
+                    style={[styles.dialogConfirmText, { color: theme.accentText }]}
+                  >
+                    Update
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -444,6 +646,15 @@ const styles = StyleSheet.create({
   primaryBtn: { borderRadius: 12, padding: 16, alignItems: "center", marginTop: 24 },
   primaryText: { fontSize: 16, fontWeight: "700" },
 
+  secondaryBtn: {
+    borderRadius: 12,
+    padding: 15,
+    alignItems: "center",
+    marginTop: 12,
+    borderWidth: 1,
+  },
+  secondaryText: { fontSize: 15, fontWeight: "600" },
+
   divider: { height: 1, marginTop: 28, marginBottom: 16 },
   dangerZone: { fontSize: 12, letterSpacing: 1, marginBottom: 8 },
 
@@ -480,6 +691,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   dialogConfirmText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+
+  pwInput: {
+    borderRadius: 12,
+    padding: 13,
+    fontSize: 15,
+    marginBottom: 10,
+  },
+  pwUtilityRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 2,
+    marginBottom: 18,
+    paddingHorizontal: 2,
+  },
+  pwUtilityText: { fontSize: 13, fontWeight: "600" },
 
   pickItem: {
     borderRadius: 12,

@@ -5,6 +5,7 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -18,6 +19,12 @@ import { updateProfile } from "../services/api";
 // Where Supabase sends the recovery email link (backend-hosted reset page).
 const RESET_REDIRECT_URL =
   "https://saphin-ai-backend.onrender.com/reset-password";
+
+// Keyboard handling: iOS uses KeyboardAvoidingView (padding); Android uses a plain
+// View and lets the OS "resize" mode (set in app.json) lift the screen. Stacking
+// both on Android caused a double-lift / screen-doubling bug (see handover §9 #26).
+// The ScrollView is a safety net so no field is ever trapped under the keyboard.
+const KeyboardWrapper: any = Platform.OS === "ios" ? KeyboardAvoidingView : View;
 
 export default function AuthScreen() {
   const [email, setEmail] = useState("");
@@ -168,101 +175,84 @@ export default function AuthScreen() {
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      <KeyboardWrapper
+        {...(Platform.OS === "ios" ? { behavior: "padding" } : {})}
         style={styles.flex}
       >
-        <Animated.View
-          style={[
-            styles.container,
-            { opacity: fade, transform: [{ translateY: slide }] },
-          ]}
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <View style={styles.brand}>
-            <View style={styles.orb} />
-            <Text style={styles.appName}>Your Companion</Text>
-            <Text style={styles.tagline}>
-              A warm space to talk, whenever you need it.
-            </Text>
-          </View>
-
           <Animated.View
             style={[
-              styles.card,
-              {
-                opacity: modeOpacity,
-                transform: [{ translateY: modeTranslate }],
-              },
+              styles.inner,
+              { opacity: fade, transform: [{ translateY: slide }] },
             ]}
           >
-            <Text style={styles.cardTitle}>
-              {isSignUp ? "Create your account" : "Welcome back"}
-            </Text>
-
-            {isSignUp && (
-              <TextInput
-                style={styles.input}
-                value={fullName}
-                onChangeText={setFullName}
-                placeholder="Full name"
-                placeholderTextColor="#8b8ba7"
-                autoCapitalize="words"
-                returnKeyType="next"
-                onSubmitEditing={() => emailRef.current?.focus()}
-              />
-            )}
-
-            <TextInput
-              ref={emailRef}
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Email"
-              placeholderTextColor="#8b8ba7"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              returnKeyType="next"
-              onSubmitEditing={() => passwordRef.current?.focus()}
-              blurOnSubmit={false}
-            />
-
-            <View style={styles.passwordRow}>
-              <TextInput
-                ref={passwordRef}
-                style={styles.passwordInput}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Password"
-                placeholderTextColor="#8b8ba7"
-                secureTextEntry={!showPassword}
-                returnKeyType={isSignUp ? "next" : "done"}
-                onSubmitEditing={() =>
-                  isSignUp ? confirmRef.current?.focus() : handleSubmit()
-                }
-                blurOnSubmit={!isSignUp}
-              />
-              <TouchableOpacity
-                style={styles.toggle}
-                onPress={() => setShowPassword((v) => !v)}
-              >
-                <Text style={styles.toggleText}>
-                  {showPassword ? "Hide" : "Show"}
-                </Text>
-              </TouchableOpacity>
+            <View style={styles.brand}>
+              <View style={styles.orb} />
+              <Text style={styles.appName}>Your Companion</Text>
+              <Text style={styles.tagline}>
+                A warm space to talk, whenever you need it.
+              </Text>
             </View>
 
-            {isSignUp && (
+            <Animated.View
+              style={[
+                styles.card,
+                {
+                  opacity: modeOpacity,
+                  transform: [{ translateY: modeTranslate }],
+                },
+              ]}
+            >
+              <Text style={styles.cardTitle}>
+                {isSignUp ? "Create your account" : "Welcome back"}
+              </Text>
+
+              {isSignUp && (
+                <TextInput
+                  style={styles.input}
+                  value={fullName}
+                  onChangeText={setFullName}
+                  placeholder="Full name"
+                  placeholderTextColor="#8b8ba7"
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                  onSubmitEditing={() => emailRef.current?.focus()}
+                />
+              )}
+
+              <TextInput
+                ref={emailRef}
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Email"
+                placeholderTextColor="#8b8ba7"
+                autoCapitalize="none"
+                keyboardType="email-address"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                blurOnSubmit={false}
+              />
+
               <View style={styles.passwordRow}>
                 <TextInput
-                  ref={confirmRef}
+                  ref={passwordRef}
                   style={styles.passwordInput}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  placeholder="Confirm password"
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Password"
                   placeholderTextColor="#8b8ba7"
                   secureTextEntry={!showPassword}
-                  returnKeyType="done"
-                  onSubmitEditing={handleSubmit}
+                  returnKeyType={isSignUp ? "next" : "done"}
+                  onSubmitEditing={() =>
+                    isSignUp ? confirmRef.current?.focus() : handleSubmit()
+                  }
+                  blurOnSubmit={!isSignUp}
                 />
                 <TouchableOpacity
                   style={styles.toggle}
@@ -273,42 +263,66 @@ export default function AuthScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
-            )}
 
-            {!isSignUp && (
+              {isSignUp && (
+                <View style={styles.passwordRow}>
+                  <TextInput
+                    ref={confirmRef}
+                    style={styles.passwordInput}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    placeholder="Confirm password"
+                    placeholderTextColor="#8b8ba7"
+                    secureTextEntry={!showPassword}
+                    returnKeyType="done"
+                    onSubmitEditing={handleSubmit}
+                  />
+                  <TouchableOpacity
+                    style={styles.toggle}
+                    onPress={() => setShowPassword((v) => !v)}
+                  >
+                    <Text style={styles.toggleText}>
+                      {showPassword ? "Hide" : "Show"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {!isSignUp && (
+                <TouchableOpacity
+                  style={styles.forgotWrap}
+                  onPress={handleForgotPassword}
+                  disabled={loading}
+                >
+                  <Text style={styles.forgotText}>Forgot password?</Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
-                style={styles.forgotWrap}
-                onPress={handleForgotPassword}
+                style={styles.button}
+                onPress={handleSubmit}
                 disabled={loading}
               >
-                <Text style={styles.forgotText}>Forgot password?</Text>
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>
+                    {isSignUp ? "Sign up" : "Log in"}
+                  </Text>
+                )}
               </TouchableOpacity>
-            )}
 
-            <TouchableOpacity
-              style={styles.button}
-              onPress={handleSubmit}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>
-                  {isSignUp ? "Sign up" : "Log in"}
+              <TouchableOpacity onPress={switchMode}>
+                <Text style={styles.switchText}>
+                  {isSignUp
+                    ? "Already have an account? Log in"
+                    : "New here? Create an account"}
                 </Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={switchMode}>
-              <Text style={styles.switchText}>
-                {isSignUp
-                  ? "Already have an account? Log in"
-                  : "New here? Create an account"}
-              </Text>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </Animated.View>
           </Animated.View>
-        </Animated.View>
-      </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardWrapper>
     </LinearGradient>
   );
 }
@@ -316,7 +330,12 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   gradient: { flex: 1 },
   flex: { flex: 1 },
-  container: { flex: 1, justifyContent: "center", padding: 28 },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    padding: 28,
+  },
+  inner: {},
   brand: { alignItems: "center", marginBottom: 36 },
   orb: {
     width: 72,
