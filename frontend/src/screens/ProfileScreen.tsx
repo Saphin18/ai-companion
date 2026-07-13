@@ -6,6 +6,7 @@ import {
   Modal,
   Pressable,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -20,6 +21,13 @@ import {
   uploadAvatar,
 } from "../services/api";
 import { useTheme, ThemeMode } from "../context/ThemeContext";
+import {
+  isBiometricAvailable,
+  isBiometricEnabled,
+  enableBiometric,
+  disableBiometric,
+  authenticateBiometric,
+} from "../services/biometrics";
 
 // Same reset page the login screen uses (backend-hosted).
 const RESET_REDIRECT_URL =
@@ -52,6 +60,13 @@ export default function ProfileScreen({ onClose }: Props) {
   const [changingPw, setChangingPw] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
 
+  // Biometric state
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioEnabled, setBioEnabled] = useState(false);
+  const [bioBusy, setBioBusy] = useState(false);
+  const [bioDialogOpen, setBioDialogOpen] = useState(false);
+  const [bioPw, setBioPw] = useState("");
+
   useEffect(() => {
     (async () => {
       try {
@@ -62,6 +77,12 @@ export default function ProfileScreen({ onClose }: Props) {
         setName(n);
         setSavedName(n);
         setAvatarUrl(profile.avatar_url ?? null);
+        const [available, enabled] = await Promise.all([
+          isBiometricAvailable(),
+          isBiometricEnabled(),
+        ]);
+        setBioAvailable(available);
+        setBioEnabled(enabled);
       } catch (e) {
         console.warn(e);
       } finally {
@@ -89,6 +110,65 @@ export default function ProfileScreen({ onClose }: Props) {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+  };
+
+  // Biometric toggle: ON asks for password + fingerprint; OFF wipes stored creds.
+  const onToggleBiometric = async (value: boolean) => {
+    if (value) {
+      setBioPw("");
+      setBioDialogOpen(true);
+    } else {
+      setBioBusy(true);
+      try {
+        await disableBiometric();
+        setBioEnabled(false);
+        Alert.alert("Turned off", "Fingerprint login has been disabled.");
+      } catch {
+        Alert.alert("Error", "Could not turn off fingerprint login.");
+      } finally {
+        setBioBusy(false);
+      }
+    }
+  };
+
+  const confirmEnableBiometric = async () => {
+    if (!bioPw) {
+      Alert.alert("Password needed", "Enter your password to enable fingerprint login.");
+      return;
+    }
+    setBioBusy(true);
+    try {
+      // 1) Verify the password is correct.
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: bioPw,
+      });
+      if (error) {
+        Alert.alert("Wrong password", "That password is incorrect.");
+        setBioBusy(false);
+        return;
+      }
+      // 2) Confirm identity with a fingerprint scan before storing.
+      const ok = await authenticateBiometric();
+      if (!ok) {
+        Alert.alert("Cancelled", "Fingerprint not confirmed. Nothing was saved.");
+        setBioBusy(false);
+        return;
+      }
+      // 3) Store credentials in the encrypted keystore.
+      await enableBiometric(email.trim(), bioPw);
+      setBioEnabled(true);
+      setBioDialogOpen(false);
+      setBioPw("");
+      Alert.alert(
+        "Fingerprint login on",
+        "Next time, tap the fingerprint icon on the login screen to log in."
+      );
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not enable fingerprint login.");
+    } finally {
+      setBioBusy(false);
+    }
   };
 
   const openPwDialog = () => {
@@ -121,7 +201,6 @@ export default function ProfileScreen({ onClose }: Props) {
     }
     setChangingPw(true);
     try {
-      // 1) Verify the current password by re-authenticating with it.
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: currentPw,
@@ -134,11 +213,19 @@ export default function ProfileScreen({ onClose }: Props) {
         setChangingPw(false);
         return;
       }
-      // 2) Update to the new password.
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPw,
       });
       if (updateError) throw updateError;
+
+      // Keep fingerprint login working: refresh the stored password if enabled.
+      try {
+        if (await isBiometricEnabled()) {
+          await enableBiometric(email.trim(), newPw);
+        }
+      } catch {
+        // ignore
+      }
 
       setPwOpen(false);
       Alert.alert("Password changed", "Your password has been updated.");
@@ -175,6 +262,12 @@ export default function ProfileScreen({ onClose }: Props) {
   const doDeleteAccount = async () => {
     setDeleting(true);
     try {
+      // Wipe any stored biometric credentials on account deletion.
+      try {
+        await disableBiometric();
+      } catch {
+        // ignore
+      }
       await deleteAccount();
       await supabase.auth.signOut();
     } catch (e) {
@@ -354,6 +447,11 @@ export default function ProfileScreen({ onClose }: Props) {
         </Text>
       </TouchableOpacity>
 
+      <View style={[styles.divider, { backgroundColor: theme.border }]} />
+      <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+        SECURITY
+      </Text>
+
       <TouchableOpacity
         style={[styles.secondaryBtn, { borderColor: theme.border }]}
         onPress={openPwDialog}
@@ -363,8 +461,36 @@ export default function ProfileScreen({ onClose }: Props) {
         </Text>
       </TouchableOpacity>
 
+      {bioAvailable && (
+        <View
+          style={[
+            styles.bioRow,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+          ]}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.bioTitle, { color: theme.textPrimary }]}>
+              Fingerprint login
+            </Text>
+            <Text style={[styles.bioSub, { color: theme.textSecondary }]}>
+              Use your fingerprint or face to log in.
+            </Text>
+          </View>
+          {bioBusy ? (
+            <ActivityIndicator color={theme.accent} />
+          ) : (
+            <Switch
+              value={bioEnabled}
+              onValueChange={onToggleBiometric}
+              trackColor={{ false: theme.border, true: theme.accent }}
+              thumbColor="#fff"
+            />
+          )}
+        </View>
+      )}
+
       <View style={[styles.divider, { backgroundColor: theme.border }]} />
-      <Text style={[styles.dangerZone, { color: theme.textSecondary }]}>
+      <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
         DANGER ZONE
       </Text>
 
@@ -429,6 +555,65 @@ export default function ProfileScreen({ onClose }: Props) {
                 Cancel
               </Text>
             </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Enable-biometric dialog */}
+      <Modal
+        visible={bioDialogOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !bioBusy && setBioDialogOpen(false)}
+      >
+        <Pressable
+          style={[styles.overlay, { backgroundColor: theme.overlay }]}
+          onPress={() => !bioBusy && setBioDialogOpen(false)}
+        >
+          <Pressable style={[styles.dialog, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.dialogTitle, { color: theme.textPrimary }]}>
+              Enable fingerprint login
+            </Text>
+            <Text style={[styles.dialogBody, { color: theme.textSecondary }]}>
+              Enter your password to turn on fingerprint login. It's stored securely
+              on this device only.
+            </Text>
+            <TextInput
+              style={[
+                styles.pwInput,
+                { backgroundColor: theme.surfaceAlt, color: theme.textPrimary },
+              ]}
+              value={bioPw}
+              onChangeText={setBioPw}
+              placeholder="Your password"
+              placeholderTextColor={theme.textSecondary}
+              secureTextEntry
+              autoCapitalize="none"
+            />
+            <View style={styles.dialogActions}>
+              <TouchableOpacity
+                style={[styles.dialogCancel, { borderColor: theme.border }]}
+                onPress={() => setBioDialogOpen(false)}
+                disabled={bioBusy}
+              >
+                <Text style={[styles.dialogCancelText, { color: theme.textPrimary }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dialogConfirm, { backgroundColor: theme.accent }]}
+                onPress={confirmEnableBiometric}
+                disabled={bioBusy}
+              >
+                {bioBusy ? (
+                  <ActivityIndicator color={theme.accentText} />
+                ) : (
+                  <Text style={[styles.dialogConfirmText, { color: theme.accentText }]}>
+                    Enable
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -520,9 +705,7 @@ export default function ProfileScreen({ onClose }: Props) {
                 {changingPw ? (
                   <ActivityIndicator color={theme.accentText} />
                 ) : (
-                  <Text
-                    style={[styles.dialogConfirmText, { color: theme.accentText }]}
-                  >
+                  <Text style={[styles.dialogConfirmText, { color: theme.accentText }]}>
                     Update
                   </Text>
                 )}
@@ -650,13 +833,24 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 15,
     alignItems: "center",
-    marginTop: 12,
+    marginTop: 4,
     borderWidth: 1,
   },
   secondaryText: { fontSize: 15, fontWeight: "600" },
 
-  divider: { height: 1, marginTop: 28, marginBottom: 16 },
-  dangerZone: { fontSize: 12, letterSpacing: 1, marginBottom: 8 },
+  bioRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+    marginTop: 12,
+  },
+  bioTitle: { fontSize: 15, fontWeight: "600" },
+  bioSub: { fontSize: 12, marginTop: 2 },
+
+  divider: { height: 1, marginTop: 24, marginBottom: 16 },
+  sectionLabel: { fontSize: 12, letterSpacing: 1, marginBottom: 12 },
 
   logoutBtn: { borderRadius: 12, padding: 14, alignItems: "center" },
   logoutText: { fontSize: 16, fontWeight: "600" },
@@ -692,12 +886,7 @@ const styles = StyleSheet.create({
   },
   dialogConfirmText: { color: "#fff", fontSize: 15, fontWeight: "700" },
 
-  pwInput: {
-    borderRadius: 12,
-    padding: 13,
-    fontSize: 15,
-    marginBottom: 10,
-  },
+  pwInput: { borderRadius: 12, padding: 13, fontSize: 15, marginBottom: 10 },
   pwUtilityRow: {
     flexDirection: "row",
     justifyContent: "space-between",

@@ -1,12 +1,15 @@
-// Biometric quick-unlock helpers.
-// Biometrics guard a LOCAL lock only — the real Supabase session still lives in
-// its own secure storage. This just gates access to the already-logged-in app.
+// Biometric login (banking-app style): stores email + password in the device's
+// encrypted keystore (expo-secure-store). Enabled from Profile (re-enter password),
+// used from the Login screen (fingerprint button). Password is only stored when the
+// user explicitly enables it and confirms their password.
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 
-const KEY = "biometric_setting"; // null = never asked, "true" = on, "false" = off
+const ENABLED_KEY = "biometric_enabled";
+const EMAIL_KEY = "biometric_email";
+const PW_KEY = "biometric_password";
 
-// Does this device have fingerprint/face hardware AND an enrolled biometric?
+// Device has fingerprint/face hardware AND an enrolled biometric.
 export async function isBiometricAvailable(): Promise<boolean> {
   try {
     const hasHardware = await LocalAuthentication.hasHardwareAsync();
@@ -17,33 +20,54 @@ export async function isBiometricAvailable(): Promise<boolean> {
   }
 }
 
-// Raw stored choice: null (never asked), "true", or "false".
-export async function getBiometricSetting(): Promise<string | null> {
+export async function isBiometricEnabled(): Promise<boolean> {
   try {
-    return await SecureStore.getItemAsync(KEY);
+    return (await SecureStore.getItemAsync(ENABLED_KEY)) === "true";
+  } catch {
+    return false;
+  }
+}
+
+// Turn on: store credentials in the encrypted keystore + set the flag.
+export async function enableBiometric(
+  email: string,
+  password: string
+): Promise<void> {
+  await SecureStore.setItemAsync(EMAIL_KEY, email);
+  await SecureStore.setItemAsync(PW_KEY, password);
+  await SecureStore.setItemAsync(ENABLED_KEY, "true");
+}
+
+// Turn off: wipe stored credentials + clear the flag.
+export async function disableBiometric(): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(EMAIL_KEY);
+    await SecureStore.deleteItemAsync(PW_KEY);
+  } catch {
+    // ignore
+  }
+  await SecureStore.setItemAsync(ENABLED_KEY, "false");
+}
+
+export async function getStoredCredentials(): Promise
+  { email: string; password: string } | null
+> {
+  try {
+    const email = await SecureStore.getItemAsync(EMAIL_KEY);
+    const password = await SecureStore.getItemAsync(PW_KEY);
+    if (email && password) return { email, password };
+    return null;
   } catch {
     return null;
   }
 }
 
-export async function isBiometricEnabled(): Promise<boolean> {
-  return (await getBiometricSetting()) === "true";
-}
-
-export async function setBiometricEnabled(enabled: boolean): Promise<void> {
-  try {
-    await SecureStore.setItemAsync(KEY, enabled ? "true" : "false");
-  } catch {
-    // ignore write failures; app still works with password login
-  }
-}
-
-// Prompt the OS biometric dialog. Returns true on success.
+// Show the OS fingerprint/face prompt. Returns true on success.
 export async function authenticateBiometric(): Promise<boolean> {
   try {
     const res = await LocalAuthentication.authenticateAsync({
-      promptMessage: "Unlock Saphin AI",
-      fallbackLabel: "Use device PIN",
+      promptMessage: "Log in to Saphin AI",
+      fallbackLabel: "Use password",
       cancelLabel: "Cancel",
       disableDeviceFallback: false,
     });

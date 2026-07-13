@@ -13,17 +13,23 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../services/supabase";
 import { updateProfile } from "../services/api";
+import {
+  isBiometricAvailable,
+  isBiometricEnabled,
+  getStoredCredentials,
+  authenticateBiometric,
+  enableBiometric,
+} from "../services/biometrics";
 
 // Where Supabase sends the recovery email link (backend-hosted reset page).
 const RESET_REDIRECT_URL =
   "https://saphin-ai-backend.onrender.com/reset-password";
 
-// Keyboard handling: iOS uses KeyboardAvoidingView (padding); Android uses a plain
-// View and lets the OS "resize" mode (set in app.json) lift the screen. Stacking
-// both on Android caused a double-lift / screen-doubling bug (see handover §9 #26).
-// The ScrollView is a safety net so no field is ever trapped under the keyboard.
+// Keyboard: iOS uses KeyboardAvoidingView (padding); Android uses a plain View and
+// lets the OS "resize" mode lift the screen (stacking both doubled it — handover §9 #26).
 const KeyboardWrapper: any = Platform.OS === "ios" ? KeyboardAvoidingView : View;
 
 export default function AuthScreen() {
@@ -34,6 +40,7 @@ export default function AuthScreen() {
   const [fullName, setFullName] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [canUseBiometric, setCanUseBiometric] = useState(false);
 
   const passwordRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
@@ -50,6 +57,23 @@ export default function AuthScreen() {
     ]).start();
   }, []);
 
+  // Show the fingerprint button only if biometrics are enabled, the device
+  // supports them, and we have stored credentials to log in with.
+  useEffect(() => {
+    (async () => {
+      try {
+        const [enabled, available, creds] = await Promise.all([
+          isBiometricEnabled(),
+          isBiometricAvailable(),
+          getStoredCredentials(),
+        ]);
+        setCanUseBiometric(enabled && available && !!creds);
+      } catch {
+        setCanUseBiometric(false);
+      }
+    })();
+  }, []);
+
   const switchMode = () => {
     Animated.timing(modeAnim, {
       toValue: 1,
@@ -57,7 +81,6 @@ export default function AuthScreen() {
       useNativeDriver: true,
     }).start(() => {
       setIsSignUp((prev) => !prev);
-      // Clear the confirm field when switching modes so a stale value never blocks login.
       setConfirmPassword("");
       modeAnim.setValue(-1);
       Animated.timing(modeAnim, {
@@ -87,15 +110,44 @@ export default function AuthScreen() {
     }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        email.trim(),
-        { redirectTo: RESET_REDIRECT_URL }
-      );
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: RESET_REDIRECT_URL,
+      });
       if (error) throw error;
       Alert.alert(
         "Check your email",
         "If an account exists for that email, we sent a link to reset your password."
       );
+    } catch (e: any) {
+      Alert.alert("Error", e.message ?? "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    const creds = await getStoredCredentials();
+    if (!creds) {
+      Alert.alert("Not set up", "Please log in with your password first.");
+      setCanUseBiometric(false);
+      return;
+    }
+    const ok = await authenticateBiometric();
+    if (!ok) return; // user cancelled or failed; stay on password screen
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: creds.email,
+        password: creds.password,
+      });
+      if (error) {
+        // Stored password no longer valid (e.g. changed elsewhere).
+        Alert.alert(
+          "Please log in again",
+          "Your saved login is out of date. Enter your password to continue."
+        );
+        setCanUseBiometric(false);
+      }
     } catch (e: any) {
       Alert.alert("Error", e.message ?? "Something went wrong.");
     } finally {
@@ -125,15 +177,13 @@ export default function AuthScreen() {
     }
     setLoading(true);
     try {
-     if (isSignUp) {
-       const { data, error } = await supabase.auth.signUp({
+      if (isSignUp) {
+        const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
           options: { data: { full_name: fullName.trim() } },
         });
         if (error) throw error;
-        // Supabase hides "email exists" for security: it returns success with an
-        // empty identities array and sends no email. Detect that and tell the user.
         if (data.user && data.user.identities && data.user.identities.length === 0) {
           Alert.alert(
             "Email already registered",
@@ -160,6 +210,15 @@ export default function AuthScreen() {
           password,
         });
         if (error) throw error;
+        // If biometrics are already enabled, refresh the stored password so a
+        // recent password change keeps fingerprint login working.
+        try {
+          if (await isBiometricEnabled()) {
+            await enableBiometric(email.trim(), password);
+          }
+        } catch {
+          // ignore
+        }
       }
     } catch (e: any) {
       Alert.alert("Error", e.message ?? "Something went wrong.");
@@ -186,10 +245,7 @@ export default function AuthScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Animated.View
-            style={[
-              styles.inner,
-              { opacity: fade, transform: [{ translateY: slide }] },
-            ]}
+            style={[styles.inner, { opacity: fade, transform: [{ translateY: slide }] }]}
           >
             <View style={styles.brand}>
               <View style={styles.orb} />
@@ -202,10 +258,7 @@ export default function AuthScreen() {
             <Animated.View
               style={[
                 styles.card,
-                {
-                  opacity: modeOpacity,
-                  transform: [{ translateY: modeTranslate }],
-                },
+                { opacity: modeOpacity, transform: [{ translateY: modeTranslate }] },
               ]}
             >
               <Text style={styles.cardTitle}>
@@ -298,19 +351,44 @@ export default function AuthScreen() {
                 </TouchableOpacity>
               )}
 
-              <TouchableOpacity
-                style={styles.button}
-                onPress={handleSubmit}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>
-                    {isSignUp ? "Sign up" : "Log in"}
-                  </Text>
-                )}
-              </TouchableOpacity>
+              {/* Login row: password button + optional fingerprint button */}
+              {isSignUp ? (
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={handleSubmit}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.buttonText}>Sign up</Text>
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.loginRow}>
+                  <TouchableOpacity
+                    style={[styles.button, styles.loginButton]}
+                    onPress={handleSubmit}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.buttonText}>Log in</Text>
+                    )}
+                  </TouchableOpacity>
+
+                  {canUseBiometric && (
+                    <TouchableOpacity
+                      style={styles.bioButton}
+                      onPress={handleBiometricLogin}
+                      disabled={loading}
+                    >
+                      <Ionicons name="finger-print" size={28} color="#a99cf5" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
 
               <TouchableOpacity onPress={switchMode}>
                 <Text style={styles.switchText}>
@@ -330,11 +408,7 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   gradient: { flex: 1 },
   flex: { flex: 1 },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: "center",
-    padding: 28,
-  },
+  scrollContent: { flexGrow: 1, justifyContent: "center", padding: 28 },
   inner: {},
   brand: { alignItems: "center", marginBottom: 36 },
   orb: {
@@ -386,38 +460,34 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     paddingRight: 6,
   },
-  passwordInput: {
-    flex: 1,
-    color: "#fff",
-    padding: 15,
-    fontSize: 16,
-  },
-  toggle: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  toggleText: {
-    color: "#a99cf5",
-    fontSize: 14,
-    fontWeight: "600",
-  },
+  passwordInput: { flex: 1, color: "#fff", padding: 15, fontSize: 16 },
+  toggle: { paddingHorizontal: 12, paddingVertical: 8 },
+  toggleText: { color: "#a99cf5", fontSize: 14, fontWeight: "600" },
   forgotWrap: {
     alignSelf: "flex-end",
     marginTop: -2,
     marginBottom: 14,
     paddingVertical: 4,
   },
-  forgotText: {
-    color: "#a99cf5",
-    fontSize: 14,
-    fontWeight: "600",
-  },
+  forgotText: { color: "#a99cf5", fontSize: 14, fontWeight: "600" },
+  loginRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
   button: {
     backgroundColor: "#7c6cf0",
     borderRadius: 14,
     padding: 16,
     alignItems: "center",
-    marginTop: 6,
+  },
+  loginButton: { flex: 1 },
+  bioButton: {
+    marginLeft: 12,
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(169,156,245,0.6)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   switchText: {
