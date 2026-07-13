@@ -49,7 +49,7 @@ export async function disableBiometric(): Promise<void> {
   await SecureStore.setItemAsync(ENABLED_KEY, "false");
 }
 
-export async function getStoredCredentials(): Promise
+export async function getStoredCredentials(): Promise<
   { email: string; password: string } | null
 > {
   try {

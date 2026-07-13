@@ -5,6 +5,7 @@ import {
   Image,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -346,175 +347,182 @@ export default function ProfileScreen({ onClose }: Props) {
         <View style={{ width: 50 }} />
       </View>
 
-      <View style={styles.avatarWrap}>
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => setPickerOpen(true)}
-          disabled={uploading}
-        >
-          <View style={[styles.avatar, { backgroundColor: theme.accent }]}>
-            {avatarUrl ? (
-              <Image
-                source={{ uri: avatarUrl }}
-                style={styles.avatarImg}
-                resizeMode="cover"
-              />
-            ) : (
-              <Text style={[styles.avatarText, { color: theme.accentText }]}>
-                {initial}
-              </Text>
-            )}
-            {uploading && (
-              <View style={styles.avatarOverlay}>
-                <ActivityIndicator color="#fff" />
-              </View>
-            )}
-          </View>
-          <View
-            style={[
-              styles.cameraBadge,
-              { backgroundColor: theme.surface, borderColor: theme.background },
-            ]}
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.avatarWrap}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => setPickerOpen(true)}
+            disabled={uploading}
           >
-            <Text style={styles.cameraIcon}>📷</Text>
-          </View>
-        </TouchableOpacity>
-        <Text style={[styles.avatarHint, { color: theme.textSecondary }]}>
-          Tap to change photo
-        </Text>
-      </View>
-
-      <Text style={[styles.label, { color: theme.textSecondary }]}>
-        Display name
-      </Text>
-      <TextInput
-        style={[
-          styles.input,
-          { backgroundColor: theme.surface, color: theme.textPrimary },
-        ]}
-        value={name}
-        onChangeText={setName}
-        placeholder="What should I call you?"
-        placeholderTextColor={theme.textSecondary}
-      />
-
-      <Text style={[styles.label, { color: theme.textSecondary }]}>Email</Text>
-      <Text style={[styles.readonly, { color: theme.textPrimary }]}>{email}</Text>
-
-      <Text style={[styles.label, { color: theme.textSecondary }]}>Appearance</Text>
-      <View
-        style={[
-          styles.segment,
-          { backgroundColor: theme.surface, borderColor: theme.border },
-        ]}
-      >
-        {THEME_OPTIONS.map((opt) => {
-          const active = mode === opt.key;
-          return (
-            <TouchableOpacity
-              key={opt.key}
-              style={[styles.segmentItem, active && { backgroundColor: theme.accent }]}
-              onPress={() => setMode(opt.key)}
+            <View style={[styles.avatar, { backgroundColor: theme.accent }]}>
+              {avatarUrl ? (
+                <Image
+                  source={{ uri: avatarUrl }}
+                  style={styles.avatarImg}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text style={[styles.avatarText, { color: theme.accentText }]}>
+                  {initial}
+                </Text>
+              )}
+              {uploading && (
+                <View style={styles.avatarOverlay}>
+                  <ActivityIndicator color="#fff" />
+                </View>
+              )}
+            </View>
+            <View
+              style={[
+                styles.cameraBadge,
+                { backgroundColor: theme.surface, borderColor: theme.background },
+              ]}
             >
-              <Text
-                style={[
-                  styles.segmentText,
-                  { color: active ? theme.accentText : theme.textSecondary },
-                ]}
-              >
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+              <Text style={styles.cameraIcon}>📷</Text>
+            </View>
+          </TouchableOpacity>
+          <Text style={[styles.avatarHint, { color: theme.textSecondary }]}>
+            Tap to change photo
+          </Text>
+        </View>
 
-      <TouchableOpacity
-        style={[
-          styles.primaryBtn,
-          { backgroundColor: nameChanged ? theme.accent : theme.surface },
-        ]}
-        onPress={handleSave}
-        disabled={!nameChanged || saving}
-      >
-        <Text
+        <Text style={[styles.label, { color: theme.textSecondary }]}>
+          Display name
+        </Text>
+        <TextInput
           style={[
-            styles.primaryText,
-            { color: nameChanged ? theme.accentText : theme.textSecondary },
+            styles.input,
+            { backgroundColor: theme.surface, color: theme.textPrimary },
           ]}
-        >
-          {saving ? "Saving..." : "Save"}
-        </Text>
-      </TouchableOpacity>
+          value={name}
+          onChangeText={setName}
+          placeholder="What should I call you?"
+          placeholderTextColor={theme.textSecondary}
+        />
 
-      <View style={[styles.divider, { backgroundColor: theme.border }]} />
-      <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-        SECURITY
-      </Text>
+        <Text style={[styles.label, { color: theme.textSecondary }]}>Email</Text>
+        <Text style={[styles.readonly, { color: theme.textPrimary }]}>{email}</Text>
 
-      <TouchableOpacity
-        style={[styles.secondaryBtn, { borderColor: theme.border }]}
-        onPress={openPwDialog}
-      >
-        <Text style={[styles.secondaryText, { color: theme.textPrimary }]}>
-          Change password
-        </Text>
-      </TouchableOpacity>
-
-      {bioAvailable && (
+        <Text style={[styles.label, { color: theme.textSecondary }]}>Appearance</Text>
         <View
           style={[
-            styles.bioRow,
+            styles.segment,
             { backgroundColor: theme.surface, borderColor: theme.border },
           ]}
         >
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.bioTitle, { color: theme.textPrimary }]}>
-              Fingerprint login
-            </Text>
-            <Text style={[styles.bioSub, { color: theme.textSecondary }]}>
-              Use your fingerprint or face to log in.
-            </Text>
-          </View>
-          {bioBusy ? (
-            <ActivityIndicator color={theme.accent} />
-          ) : (
-            <Switch
-              value={bioEnabled}
-              onValueChange={onToggleBiometric}
-              trackColor={{ false: theme.border, true: theme.accent }}
-              thumbColor="#fff"
-            />
-          )}
+          {THEME_OPTIONS.map((opt) => {
+            const active = mode === opt.key;
+            return (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.segmentItem, active && { backgroundColor: theme.accent }]}
+                onPress={() => setMode(opt.key)}
+              >
+                <Text
+                  style={[
+                    styles.segmentText,
+                    { color: active ? theme.accentText : theme.textSecondary },
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-      )}
 
-      <View style={[styles.divider, { backgroundColor: theme.border }]} />
-      <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-        DANGER ZONE
-      </Text>
-
-      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-        <Text style={[styles.logoutText, { color: theme.danger }]}>Log out</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.deleteBtn, { borderColor: theme.danger }]}
-        onPress={() => setDeleteStep(1)}
-        disabled={deleting}
-      >
-        {deleting ? (
-          <ActivityIndicator color={theme.danger} />
-        ) : (
-          <Text style={[styles.deleteText, { color: theme.danger }]}>
-            Delete my account
+        <TouchableOpacity
+          style={[
+            styles.primaryBtn,
+            { backgroundColor: nameChanged ? theme.accent : theme.surface },
+          ]}
+          onPress={handleSave}
+          disabled={!nameChanged || saving}
+        >
+          <Text
+            style={[
+              styles.primaryText,
+              { color: nameChanged ? theme.accentText : theme.textSecondary },
+            ]}
+          >
+            {saving ? "Saving..." : "Save"}
           </Text>
+        </TouchableOpacity>
+
+        <View style={[styles.divider, { backgroundColor: theme.border }]} />
+        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+          SECURITY
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.secondaryBtn, { borderColor: theme.border }]}
+          onPress={openPwDialog}
+        >
+          <Text style={[styles.secondaryText, { color: theme.textPrimary }]}>
+            Change password
+          </Text>
+        </TouchableOpacity>
+
+        {bioAvailable && (
+          <View
+            style={[
+              styles.bioRow,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.bioTitle, { color: theme.textPrimary }]}>
+                Fingerprint login
+              </Text>
+              <Text style={[styles.bioSub, { color: theme.textSecondary }]}>
+                Use your fingerprint or face to log in.
+              </Text>
+            </View>
+            {bioBusy ? (
+              <ActivityIndicator color={theme.accent} />
+            ) : (
+              <Switch
+                value={bioEnabled}
+                onValueChange={onToggleBiometric}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor="#fff"
+              />
+            )}
+          </View>
         )}
-      </TouchableOpacity>
-      <Text style={[styles.deleteHint, { color: theme.textSecondary }]}>
-        Frees your email to sign up again. Your chat history stays stored per our
-        privacy policy.
-      </Text>
+
+        <View style={[styles.divider, { backgroundColor: theme.border }]} />
+        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+          DANGER ZONE
+        </Text>
+
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+          <Text style={[styles.logoutText, { color: theme.danger }]}>Log out</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.deleteBtn, { borderColor: theme.danger }]}
+          onPress={() => setDeleteStep(1)}
+          disabled={deleting}
+        >
+          {deleting ? (
+            <ActivityIndicator color={theme.danger} />
+          ) : (
+            <Text style={[styles.deleteText, { color: theme.danger }]}>
+              Delete my account
+            </Text>
+          )}
+        </TouchableOpacity>
+        <Text style={[styles.deleteHint, { color: theme.textSecondary }]}>
+          Frees your email to sign up again. Your chat history stays stored per our
+          privacy policy.
+        </Text>
+      </ScrollView>
 
       {/* Camera / Gallery picker dialog */}
       <Modal
@@ -769,13 +777,16 @@ export default function ProfileScreen({ onClose }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, paddingTop: 60 },
+  container: { flex: 1, paddingTop: 60 },
+  flex: { flex: 1 },
+  scrollContent: { paddingHorizontal: 24, paddingBottom: 40 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 16,
+    paddingHorizontal: 24,
   },
   back: { fontSize: 17 },
   title: { fontSize: 20, fontWeight: "700" },
