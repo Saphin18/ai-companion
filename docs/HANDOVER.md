@@ -8,6 +8,65 @@
 
 ## 🔖 WHERE WE LEFT OFF (read this first)
 
+**Most recent session (Auth landing page + Password reset + Change password + Biometric login + Scroll fixes) — what we achieved:**
+- **Everything below is CODED, COMMITTED, BUILT into a new APK, and TESTED WORKING on the real
+  installed APK.** This session's APK is the current shippable build. The AI still has **NO
+  memory yet** (Phase 2 is the next real feature area).
+- **Friendly `/confirmed` landing page (§10 old task 1 — DONE).** New backend route
+  `GET /confirmed` (`backend/app/api/confirmed.py`) serves a styled dark-purple
+  "✅ Email confirmed — open Saphin AI and log in" HTML page, wired into `main.py`. Replaced the
+  bare `{"detail":"Not Found"}` that friends saw after confirming. Supabase **Site URL** set to
+  `https://saphin-ai-backend.onrender.com/confirmed`.
+- **Password reset (§10 old task 2 — DONE).** New backend route `GET /reset-password`
+  (`backend/app/api/reset_password.py`) serves a dark-purple HTML page with a "new password"
+  form that talks to Supabase's `/auth/v1/user` endpoint directly using the recovery token from
+  the URL hash (`SUPABASE_URL` / `SUPABASE_ANON_KEY` injected from Render env at request time —
+  anon key is public by design). Frontend: **"Forgot password?"** link on `AuthScreen` calls
+  `supabase.auth.resetPasswordForEmail(email, { redirectTo: .../reset-password })`. Supabase
+  **Redirect URLs** allow-list now contains BOTH `/reset-password` AND `/confirmed`. Tested end
+  to end (email link → set new password → log in).
+- **Change password in Profile (DONE).** New "Change password" dialog in `ProfileScreen`
+  (Current password → New password → Confirm new password). Verifies the current password by
+  re-running `signInWithPassword`, then `supabase.auth.updateUser({ password })`. Includes a
+  **"Forgot password?"** link bottom-right (for users who don't remember their current password),
+  which sends the reset email. Matches the app's dark-purple dialog style.
+- **Biometric login — banking-app style (DONE, Option B = store password).** New
+  `frontend/src/services/biometrics.ts` using `expo-local-authentication` +
+  `expo-secure-store`. **Profile has a "Fingerprint login" toggle** (only shown on devices with
+  biometric hardware): turning ON asks for the password + a fingerprint scan, then stores
+  email+password in the device's **encrypted keystore**; turning OFF wipes them. **Login screen
+  shows a fingerprint button beside "Log in"** (only when enabled + creds stored): tap → scan →
+  logged in with no typing. Password changes auto-refresh the stored password; account deletion
+  wipes it. Owner explicitly chose Option B (store password, always works like a bank app) over
+  Option A (store session token) — see §0.5 #8. Native modules → only works in a real APK build,
+  NOT Expo Go.
+- **Scroll safety-net fixes (DONE).** `AuthScreen` wrapped in a `ScrollView` (login fields could
+  sit under the keyboard with nothing to scroll). **Owner personally found + fixed the same bug
+  on `ProfileScreen`** (bottom / Danger Zone was cut off on smaller screens) by wrapping its body
+  in a `ScrollView` with the header kept fixed — USE THE OWNER'S PROFILE VERSION. `ChatScreen`
+  was deliberately left unchanged (its FlatList already scrolls; wrapping a FlatList in a
+  ScrollView is invalid).
+- **AuthScreen keyboard doubling fixed.** AuthScreen was still stacking `KeyboardAvoidingView`
+  + OS `resize` on Android (the §9 #26 mistake), causing the screen to render doubled/ghosted
+  (2× overlap). Fix applied here too: `KeyboardAvoidingView` on iOS only, plain `View` on
+  Android. (Chat had already been fixed last session; Auth was missed.)
+- **Packages added this session:** `expo-local-authentication`, `expo-secure-store` (installed
+  via `npx expo install`; `expo-secure-store` auto-added its config plugin). Fingerprint icon
+  uses `@expo/vector-icons` (`Ionicons name="finger-print"`, ships with Expo).
+- **Files touched:** NEW `backend/app/api/confirmed.py`, NEW `backend/app/api/reset_password.py`,
+  MODIFIED `backend/app/main.py` (registers both routers), MODIFIED
+  `frontend/src/screens/AuthScreen.tsx` (forgot-password + fingerprint button + ScrollView +
+  keyboard fix), MODIFIED `frontend/src/screens/ProfileScreen.tsx` (change-password dialog +
+  biometric toggle + owner's ScrollView), MODIFIED `frontend/App.tsx` (imports biometrics
+  helpers; note the final App.tsx does NOT auto-lock — login-screen fingerprint button is the
+  entry point), NEW `frontend/src/services/biometrics.ts`. (An earlier draft `LockScreen.tsx`
+  was created then abandoned when we switched to the login-button approach — it is unused/harmless
+  if present.)
+- **Render deploy quirk we re-learned:** after each backend push, the new route 404s for a few
+  minutes until Render redeploys, and the browser also caches the old 404 — always check
+  `/openapi.json` (Ctrl+F the route name) to see what's actually live, then hard-refresh
+  (Ctrl+F5). See §9 #29.
+
 **Most recent session (Theme + Avatar + Delete dialog + Keyboard fix) — what we achieved:**
 - **APK was already built and installed** earlier via EAS (preview profile). Then this
   session added 3 new features + several fixes. Everything is coded and **tested in
@@ -61,18 +120,25 @@
 - Fixed session grouping, Android keyboard issues, and added an auth token-refresh guard.
 - Renamed app to **"Saphin AI"** with a custom icon; added `start.bat` for local dev.
 
-**State right now:** Phase 1 is **100% done and LIVE**, plus the new profile polish
-(theme, avatar, delete dialog). The app is fully usable end-to-end against a **public
-backend**: sign up → confirm email → log in → chats (pin/rename/remove) → edit name →
-change theme → set avatar → delete account. The AI still has **NO memory yet** (Phase 2).
+**State right now (updated this session):** Phase 1 is **100% done and LIVE**, plus profile
+polish (theme, avatar, delete dialog) AND this session's auth/security work (friendly confirm
+page, password reset, change password, biometric fingerprint login, scroll fixes). **A fresh
+APK containing ALL of the above is built and tested working on the real device.** The app is
+fully usable end-to-end against a **public backend**: sign up → confirm email (friendly page) →
+log in (password OR fingerprint) → chats (pin/rename/remove) → edit name → change theme → set
+avatar → change password → reset forgotten password → enable/disable fingerprint login →
+delete account. The AI still has **NO memory yet** (Phase 2).
 
-**➡️ WHAT WE'RE DOING NEXT: rebuild the APK** with the new features, then test on the
-real installed APK. After that: password reset, Google/Apple sign-in, then Phase 2 (memory).
+**➡️ WHAT WE'RE DOING NEXT: Phase 2 (memory)** is the next major feature — the AI currently
+forgets everything between messages beyond the current session's transcript. Optional smaller
+tasks still open: Google/Apple Sign-In, custom avatar crop screen, publish to Play Store.
 
-**➡️ IMMEDIATE NEXT STEP when resuming:** (1) confirm `frontend/app.json` has
-`"newArchEnabled": false`, (2) commit any uncommitted frontend, (3) run
-**`eas build -p android --profile preview`**, (4) test keyboard/theme/avatar/delete on the
-installed APK.
+**➡️ IMMEDIATE NEXT STEP when resuming:** decide between (a) starting **Phase 2 memory**
+(schema + extraction + context injection — an architecture task) or (b) knocking out an optional
+task (Google Sign-In). No APK rebuild is pending — the current build already ships everything.
+Reminder for any future native-module or app.json change: keep `"newArchEnabled": false`,
+commit the frontend, then `eas build -p android --profile preview`, and RE-TEST on the real APK
+(Expo Go can't show native modules or true keyboard behavior).
 
 ---
 
@@ -163,6 +229,32 @@ These are decisions I (the owner) made explicitly. Do not "improve" or reverse t
    - **Label rule (this session):** kept as **"Delete my account"** everywhere,
      dialog is the custom dark-purple two-step one (red confirm, outline cancel).
 
+6. **PASSWORD RESET & CHANGE PASSWORD (owner decision) — backend-hosted pages.**
+   - The reset page and the confirm page are both **served by the FastAPI backend**
+     (`/reset-password`, `/confirmed`), NOT deep links into the app. This keeps it simple
+     and works from any device's browser. Do not "improve" this into an in-app deep link
+     without asking.
+   - **Change password requires the current password** (verified via `signInWithPassword`).
+     A **"Forgot password?"** link sits bottom-right under the confirm field for users who
+     don't remember it — that link sends the reset email. This layout was explicitly
+     requested by the owner; keep it.
+
+7. **BIOMETRIC LOGIN LIVES IN TWO PLACES (owner decision).**
+   - **Profile** has the enable/disable toggle ("Fingerprint login").
+   - **Login screen** has the fingerprint button beside the "Log in" button (shown only when
+     enabled). This mirrors the owner's bank app (Siddhartha Bank) and was explicitly
+     requested. Do not move it to an auto-lock-on-open model.
+
+8. **BIOMETRIC STORAGE = OPTION B (store password), owner's explicit choice.**
+   - On enable, the app stores **email + password** in the device's encrypted keystore
+     (`expo-secure-store`) and logs in fresh each time via `signInWithPassword`. This is the
+     "always works, like banking apps" option. The owner was told the tradeoff (anyone who
+     passes the phone's biometric can log in; the password sits encrypted on-device) and chose
+     it over Option A (store the Supabase session token). Do not silently switch to Option A.
+   - Safety behaviors that MUST stay: changing the password refreshes the stored password;
+     deleting the account wipes stored creds; a stale/invalid stored password falls back to the
+     password screen and hides the fingerprint button.
+
 ---
 
 ## 0.6 MODEL USAGE PLAN (agreed workflow for this project)
@@ -223,8 +315,9 @@ chats list ✅, profile screen ✅, redesigned auth screen ✅, confirm password
 + email-exists detection ✅, per-chat Pin/Rename/Remove ✅, display-name save fixed ✅,
 permanent account deletion ✅, backend deployed public (Render) ✅, custom SMTP (Brevo) ✅,
 **APK built ✅**, **theme toggle ✅**, **avatar photo ✅**, **delete-account dialog restyle ✅**,
-**keyboard fix ✅**. Still open (optional): Google login ⬜, Apple Sign-In ⬜,
-password reset ⬜.
+**keyboard fix ✅**, **friendly confirm page ✅**, **password reset ✅**, **change password ✅**,
+**biometric fingerprint login ✅**, **auth+profile scroll fixes ✅**. Still open (optional):
+Google login ⬜, Apple Sign-In ⬜.
 
 **Phase 2 — Memory:** long-term memory, structured memory system, memory
 extraction, context injection. (NOTE: the AI currently has NO memory/context yet —
@@ -261,7 +354,9 @@ messages to Postgres → calls Groq → returns reply → shows on phone. On reo
 sees a **"Your Chats"** list (pinned first), taps one, and its messages load from the DB.
 Theme + avatar persist across restarts (AsyncStorage + Supabase).
 
-**Only thing between here and shipping the new features to friends: rebuild the APK.**
+**Shipping status: the current APK is built and tested working with everything through this
+session (confirm page, password reset, change password, biometric login, scroll/keyboard fixes).
+The next real feature is Phase 2 (memory) — the AI still has no long-term memory.**
 
 ---
 
@@ -303,7 +398,9 @@ Ai-Companion/
 │       │   ├── health.py          # GET /health
 │       │   ├── chat.py            # POST /chat, GET /sessions, GET /sessions/{id}/messages,
 │       │   │                      #   PATCH /sessions/{id}, DELETE /sessions/{id} (soft-hide)
-│       │   └── profile.py         # GET /profile, PUT /profile (partial update — NEW), DELETE /account
+│       │   ├── profile.py         # GET /profile, PUT /profile (partial update — NEW), DELETE /account
+│       │   ├── confirmed.py       # NEW — GET /confirmed: styled "Email confirmed" HTML page
+│       │   └── reset_password.py  # NEW — GET /reset-password: HTML new-password form (Supabase token from URL hash)
 │       └── repositories/
 │           ├── chat_repository.py    # sessions/messages + hide + update_session + pinned-first order
 │           └── profile_repository.py # get_profile + upsert_profile + update_profile_fields (NEW)
@@ -324,14 +421,18 @@ Ai-Companion/
         │   ├── ChatBubble.tsx     # theme tokens
         │   └── ChatInput.tsx      # theme tokens + spacing
         ├── screens/
-        │   ├── AuthScreen.tsx     # confirm pw, show/hide, email-exists, full_name in signup metadata (purple gradient kept)
+        │   ├── AuthScreen.tsx     # confirm pw, show/hide, email-exists, full_name metadata; + Forgot-password link,
+        │   │                      #   fingerprint login button, ScrollView, iOS-only KAV keyboard fix (NEW this session)
         │   ├── ChatsListScreen.tsx# Pin/Rename/Remove modals, pinned-first, avatar in header (NEW), theme
         │   ├── ChatScreen.tsx     # loads session messages, keyboard fix (no KAV on Android), auto-scroll, theme
-        │   └── ProfileScreen.tsx  # name, email, Appearance toggle (NEW), avatar picker (NEW),
-        │                          #   delete dialog (dark-purple, NEW), Save-only-when-changed (NEW)
+        │   │                      #   (deliberately NOT wrapped in ScrollView — FlatList already scrolls)
+        │   ├── ProfileScreen.tsx  # name, email, Appearance toggle, avatar picker, delete dialog; + Change-password
+        │   │                      #   dialog, Fingerprint-login toggle, ScrollView (owner-fixed) (NEW this session)
+        │   └── LockScreen.tsx     # abandoned draft (auto-lock approach dropped) — UNUSED/harmless if present
         └── services/
             ├── supabase.ts        # Supabase client (AsyncStorage session)
-            └── api.ts             # chat/profile/sessions + updateThemePreference/updateAvatarUrl/uploadAvatar (NEW)
+            ├── api.ts             # chat/profile/sessions + updateThemePreference/updateAvatarUrl/uploadAvatar
+            └── biometrics.ts      # NEW — expo-local-authentication + expo-secure-store; enable/disable, store/verify creds
 ```
 
 Dependencies (frontend): `expo-linear-gradient`, `@react-native-async-storage/async-storage`,
@@ -341,7 +442,7 @@ with any native module in managed Expo (e.g. `react-native-image-crop-picker` ne
 
 ---
 
-## 6. ARCHITECTURE DECISIONS (D1–D15)
+## 6. ARCHITECTURE DECISIONS (D1–D18)
 
 - **D1** Mobile: Expo/React Native.
 - **D2** Backend: FastAPI.
@@ -381,6 +482,30 @@ with any native module in managed Expo (e.g. `react-native-image-crop-picker` ne
 - **D15 (NEW)** **Partial profile updates.** `PUT /profile` uses
   `payload.model_dump(exclude_unset=True)` so the client can update just name, just theme,
   or just avatar without wiping the others. Repo helper `update_profile_fields()`.
+- **D16 (NEW)** **Auth flows use backend-hosted HTML pages, not app deep links.** Both the
+  email-confirmation page (`GET /confirmed`) and the password-reset page (`GET /reset-password`)
+  are plain HTML served by FastAPI. The reset page runs a tiny bit of JS that reads the Supabase
+  recovery token from the URL hash and calls Supabase's `PUT /auth/v1/user` directly with the
+  anon key (public by design) + `Authorization: Bearer <token>`. `SUPABASE_URL` /
+  `SUPABASE_ANON_KEY` are injected into the HTML from Render env **at request time** (string
+  replace), so nothing secret is hardcoded. Rationale: zero app-side deep-link plumbing, works
+  from any browser, trivial to host on the existing backend. Supabase **Site URL** →
+  `/confirmed`; **Redirect URLs** allow-list must include both `/confirmed` and `/reset-password`.
+- **D17 (NEW)** **Change password = verify-then-update.** Verify the current password by calling
+  `signInWithPassword` (fails → wrong password), then `updateUser({ password })`. A "Forgot
+  password?" link in the dialog sends the reset email as an escape hatch. If biometrics are on,
+  the newly-set password is re-stored so fingerprint login keeps working.
+- **D18 (NEW)** **Biometric login = local credential lock (Option B).**
+  `expo-local-authentication` gates access; `expo-secure-store` (hardware-backed encrypted
+  keystore) holds `email` + `password`. Enable is guarded by password check + a fingerprint scan
+  before storing. The **login screen** shows a fingerprint button (visible only when enabled +
+  device-capable + creds present) that scans → `signInWithPassword` with stored creds. The
+  **Profile** toggle enables/disables and wipes creds on disable. Chosen over storing the session
+  token (Option A) because the owner wants bank-app behavior that always works even after token
+  expiry (see §0.5 #8). Native modules ⇒ **APK-only**, never testable in Expo Go. Fingerprint icon
+  = `@expo/vector-icons` Ionicons `finger-print`. NOTE: the final design does NOT auto-lock the app
+  on foreground (an earlier `LockScreen.tsx` auto-lock draft was abandoned); the login-screen
+  button is the single entry point.
 
 ---
 
@@ -423,7 +548,12 @@ env: { EXPO_PUBLIC_API_URL, EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_
 **Supabase Auth config:**
 - Email confirmation is **ON** (no session immediately after signup, so the full name
   is saved on first login — see §9 #22).
-- **Site URL** = `https://saphin-ai-backend.onrender.com`. Friendly `/confirmed` page pending (§10).
+- **Site URL** = `https://saphin-ai-backend.onrender.com/confirmed` (updated this session — the
+  friendly confirm page is now built and live; this is where confirmation emails land).
+- **Redirect URLs** allow-list (Auth → URL Configuration → Redirect URLs) MUST contain BOTH:
+  `https://saphin-ai-backend.onrender.com/reset-password` AND
+  `https://saphin-ai-backend.onrender.com/confirmed`. The reset link silently fails
+  ("invalid/expired") if `/reset-password` isn't on this list, even with a valid token.
 - **Custom SMTP** under Auth → Emails → SMTP (Brevo — D11).
 - Asymmetric JWT signing (ES256); JWKS at `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`.
 
@@ -570,41 +700,78 @@ downloaded-file confusion, JWT/JWKS, provider swaps, nested git repo.)
     in a prior step. Use `git status` + `git log --oneline -3` to verify true state before
     re-committing (don't panic-recommit).
 
+**Auth pages + Password reset + Biometric session (latest):**
+29. **New backend route returns 404 right after `git push`** — twice this session `/confirmed`
+    then `/reset-password` showed `{"detail":"Not Found"}` even though the code was correct and
+    pushed. Two overlapping causes: (a) Render's free-tier redeploy takes ~3–5 min (plus queue),
+    so the OLD code is briefly still live; (b) the **browser caches the 404**. Diagnosis that
+    works every time: open `https://saphin-ai-backend.onrender.com/openapi.json` and Ctrl+F the
+    route name — if it's listed, the route IS live and it's just browser cache → hard-refresh
+    with **Ctrl+F5** / incognito. If not listed, the deploy hasn't finished (check Render →
+    Events for the commit hash / "Live") or didn't trigger (Manual Deploy → Deploy latest commit;
+    "Clear build cache & deploy" forces a clean rebuild). Don't re-edit correct code while waiting.
+30. **Password-reset link lands on "invalid/expired" with a valid token** — the reset URL wasn't
+    on Supabase's **Redirect URLs** allow-list. Add `.../reset-password` (and `.../confirmed`)
+    under Auth → URL Configuration → Redirect URLs. Site URL and Redirect URLs are SEPARATE boxes
+    with separate jobs (Site URL = default confirm landing; Redirect URLs = allow-list for links).
+31. **Expo Go can't test this session's core features.** (a) Biometrics use native modules
+    (`expo-local-authentication`, `expo-secure-store`) that **do not exist in Expo Go** — the
+    fingerprint prompt just fails there; that's expected, test only in the APK. (b) The Android
+    keyboard `resize` behavior (`app.json` `softwareKeyboardLayoutMode`) is a **native setting
+    Expo Go ignores** — the "keyboard covers the input / can't scroll to it" seen in Expo Go is
+    NOT the real app's behavior. Lesson (re-confirming §9 #26): keyboard + native modules are
+    truth-tested ONLY in a real build. A cloud EAS build and a local `npx expo start` can run at
+    the same time without interfering.
+32. **AuthScreen was doubling/ghosting (2× overlapped screen)** — AuthScreen still had the
+    §9 #26 double-lift bug (`KeyboardAvoidingView` + OS `resize` both active on Android) even
+    after ChatScreen was fixed last session. Fix: `KeyboardAvoidingView` on iOS only, plain
+    `View` on Android. Rule stands: never stack two keyboard lifters.
+33. **"Can't scroll to reach a field/button"** — a statically-centered screen has nothing to
+    scroll, so when the keyboard (or a small screen) covers the bottom, fields are unreachable.
+    Fix = wrap the screen body in a `ScrollView` (`flexGrow:1`, `justifyContent:'center'`,
+    `keyboardShouldPersistTaps:'handled'`), header kept fixed outside it. Applied to AuthScreen;
+    the **owner found and fixed the identical issue on ProfileScreen themselves** — keep the
+    owner's Profile version. Do NOT wrap a FlatList screen (ChatScreen) this way — a FlatList is
+    already a scroller and nesting them is invalid in React Native.
+
 ---
 
 ## 10. REMAINING TASKS (recommended order)
 
-0. **NEXT — rebuild + test the APK** with the new features.
-   - Confirm `frontend/app.json` has `"newArchEnabled": false` (or the keyboard bug returns).
-   - Commit any uncommitted frontend (ROOT terminal): `git add .` → `git commit -m "..."` → `git push`.
-   - Build (FRONTEND terminal): `eas build -p android --profile preview`.
-   - Install the `.apk` and TEST ON THE REAL BUILD: keyboard (header stays, input above
-     keyboard, last message visible), theme toggle (instant + persists), avatar (camera +
-     gallery upload, shows in Profile + Chats header), delete dialog (dark-purple, red confirm).
+0. **✅ DONE — rebuilt + tested the APK.** The APK with theme/avatar/delete/keyboard AND this
+   session's auth/security work was built and **tested working on the real device**. (Original
+   task text kept as history: confirm `newArchEnabled:false` → commit frontend →
+   `eas build -p android --profile preview` → test keyboard/theme/avatar/delete on the real build.)
 
-1. **(Optional, quick) Friendly `/confirmed` landing page** — small `GET /confirmed` route on
-   the backend showing "✅ Email confirmed — open the Saphin AI app and log in", then set
-   Supabase Site URL to `.../confirmed`. Replaces the bare `{"detail":"Not Found"}`.
+1. **✅ DONE — Friendly `/confirmed` landing page.** `GET /confirmed` route built + Supabase Site
+   URL pointed at it. (See this-session notes at top + §9 #29.)
 
-2. **Password reset** flow (Supabase `resetPasswordForEmail`) — needs the redirect/deep link
-   handled; easier now that Site URL + SMTP are set.
+2. **✅ DONE — Password reset flow.** `GET /reset-password` page + `resetPasswordForEmail` +
+   Redirect URLs allow-list. Tested end to end. (See §9 #30.)
 
 3. **Google Sign-In**, then **Apple Sign-In** (Apple required by App Store when other social
-   logins exist).
+   logins exist). — still open (optional).
 
 4. **(Optional) Custom crop screen** with a real Done button (native crop package + dev
-   build — risky, decide later). See §9 #27.
+   build — risky, decide later). See §9 #27. — still open (optional).
 
-5. Optional profile polish: change password.
+5. **✅ DONE — Change password.** Change-password dialog in Profile (verify current → update),
+   with a Forgot-password escape hatch. (See D17.)
 
-6. Then **Phase 2 (memory)** — Opus-high architecture task: schema, extraction, and injecting
-   past messages/facts into the prompt (the AI currently has no memory).
+5b. **✅ DONE (bonus this session) — Biometric fingerprint login.** Profile toggle + login-screen
+   fingerprint button, storing creds in the encrypted keystore (Option B). (See D18, §0.5 #7/#8.)
+
+6. **NEXT — Phase 2 (memory)** — Opus-high architecture task: schema, extraction, and injecting
+   past messages/facts into the prompt (the AI currently has no memory). This is now the main
+   remaining feature.
 
 7. **(Optional) Publish to Google Play** ($25 one-time) to remove the "unknown source"
-   install warning friends see when sideloading the APK.
+   install warning friends see when sideloading the APK. — still open (optional).
 
-**Immediate next step when resuming:** task 0 (verify newArch false → commit → rebuild APK →
-test on real build).
+**Immediate next step when resuming:** **task 6 — Phase 2 memory** (design the schema +
+extraction + context injection). No APK rebuild is pending; the current build ships everything.
+If instead doing an optional task (e.g. Google Sign-In), that's fine — feature work and the APK
+are independent.
 
 ---
 
@@ -643,7 +810,7 @@ directly on Android — no Play Store, no fees. Cost = **$0**.
 **C. Point the app at the public backend — ✅ DONE**
 - `frontend/.env` → `EXPO_PUBLIC_API_URL=https://saphin-ai-backend.onrender.com`. Verified.
 
-**D. Build the APK with EAS — ✅ DONE (first build), 🔁 REBUILD PENDING (new features)**
+**D. Build the APK with EAS — ✅ DONE (multiple builds, latest ships everything)**
 - `npm install -g eas-cli`, `eas login` (account `saphinpraja`).
 - `eas build:configure` → linked project `@saphinpraja/saphin-ai`, wrote projectId into app.json.
 - `eas.json`: preview + production profiles, `"android": { "buildType": "apk" }`,
@@ -651,8 +818,18 @@ directly on Android — no Play Store, no fees. Cost = **$0**.
 - First build succeeded: keystore auto-generated in the cloud, `.apk` download link returned.
   (Ignore the `adb ENOENT` error at the end — that's just the optional "run on emulator" step;
   the APK is already built.)
-- **REBUILD NEEDED** to ship theme + avatar + delete dialog + keyboard fix:
+- Rebuilt to ship theme + avatar + delete dialog + keyboard fix — ✅ tested working.
+- Rebuilt AGAIN this session to ship confirm page + password reset + change password + biometric
+  fingerprint login + scroll/keyboard fixes — ✅ **tested working on the real device**. This is
+  the current shippable APK.
+- **Native-module note:** `expo-local-authentication` + `expo-secure-store` were added this
+  session. They require a fresh EAS build to work (Expo Go can't run them). `expo-secure-store`
+  auto-registers a config plugin — nothing extra to configure. Build with the same command:
   `eas build -p android --profile preview`.
+- **Free-tier build time:** expect ~20–40 min total (queue wait + native compile). Status at
+  `expo.dev` → project → Builds ("In queue" / "In progress" / "Finished"). The build runs on
+  Expo's servers — you can close the terminal; the link stays valid. A local `npx expo start` can
+  run at the same time without interfering.
 
 **E. Share with friends — ✅ working**
 - Send the `.apk` (or open the EAS build link on the phone). On Android: tap → allow
@@ -670,7 +847,13 @@ directly on Android — no Play Store, no fees. Cost = **$0**.
 - If email stops sending, regenerate the Brevo SMTP key and update it in Supabase.
 - **`newArchEnabled` must stay `false`** or the keyboard bug comes back in the build.
 - The custom icon + "Saphin AI" name only appear in the real build, never in Expo Go.
+- **Biometrics + true keyboard behavior are APK-only** — never trust Expo Go for them (§9 #31).
+- After any backend push, a new route 404s for a few minutes and the browser caches it — check
+  `/openapi.json` for the route + hard-refresh (§9 #29). Not a code bug.
+- **Supabase Redirect URLs** must list both `/reset-password` and `/confirmed`, and Site URL must
+  be `.../confirmed`, or the email links misbehave (§9 #30).
 
-**When resuming: verify newArch false, commit frontend, then REBUILD the APK (Step D) and
-test on the real build.** Feature work (password reset, memory, etc.) and the APK are
-independent — either order is fine.
+**When resuming: NO APK rebuild is pending — the current build ships everything and is tested.**
+Next real work is **Phase 2 (memory)**. Feature work and the APK are independent; only rebuild
+after a native-module or app.json change (then keep `newArchEnabled:false`, commit, build, and
+re-test on the real APK).
