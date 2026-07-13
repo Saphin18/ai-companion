@@ -15,6 +15,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import { supabase } from "../services/supabase";
 import { updateProfile } from "../services/api";
 
+// Where Supabase sends the recovery email link (backend-hosted reset page).
+const RESET_REDIRECT_URL =
+  "https://saphin-ai-backend.onrender.com/reset-password";
+
 export default function AuthScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -65,6 +69,32 @@ export default function AuthScreen() {
     inputRange: [-1, 0, 1],
     outputRange: [0, 1, 0],
   });
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      Alert.alert(
+        "Enter your email",
+        "Type your account email in the Email field above, then tap “Forgot password?” again."
+      );
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        email.trim(),
+        { redirectTo: RESET_REDIRECT_URL }
+      );
+      if (error) throw error;
+      Alert.alert(
+        "Check your email",
+        "If an account exists for that email, we sent a link to reset your password."
+      );
+    } catch (e: any) {
+      Alert.alert("Error", e.message ?? "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!email.trim() || !password) {
@@ -245,6 +275,16 @@ export default function AuthScreen() {
               </View>
             )}
 
+            {!isSignUp && (
+              <TouchableOpacity
+                style={styles.forgotWrap}
+                onPress={handleForgotPassword}
+                disabled={loading}
+              >
+                <Text style={styles.forgotText}>Forgot password?</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
               style={styles.button}
               onPress={handleSubmit}
@@ -338,6 +378,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   toggleText: {
+    color: "#a99cf5",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  forgotWrap: {
+    alignSelf: "flex-end",
+    marginTop: -2,
+    marginBottom: 14,
+    paddingVertical: 4,
+  },
+  forgotText: {
     color: "#a99cf5",
     fontSize: 14,
     fontWeight: "600",
