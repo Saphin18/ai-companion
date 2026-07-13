@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai import provider_factory
+from app.ai.memory_extractor import extract_memories
 from app.auth.dependencies import get_current_user_id
 from app.db.session import get_db
 from app.models.chat import (
@@ -13,8 +14,12 @@ from app.models.chat import (
     SessionUpdate,
 )
 from app.repositories import chat_repository as repo
+from app.repositories import memory_repository as mem_repo
 
 router = APIRouter()
+
+# How many recent messages of the CURRENT chat to feed back to the AI.
+HISTORY_LIMIT = 20
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -32,14 +37,45 @@ async def chat(
     else:
         title = payload.message.strip()[:40] or "New chat"
         session = await repo.create_session(db, user_id, title=title)
+
+    # --- MEMORY: build context BEFORE saving the new user message ---
+    # Short-term: the last N messages of this conversation.
+    prior = await repo.list_messages(db, session.id, user_id)
+    history = [{"role": m.role, "content": m.content} for m in prior][-HISTORY_LIMIT:]
+
+    # Long-term: durable facts we remember about this user.
+    memories = await mem_repo.list_active_memories(db, str(user_id))
+    memory_context = None
+    if memories:
+        lines = "\n".join(f"- ({m.category}) {m.content}" for m in memories)
+        memory_context = (
+            "Things you remember about this user (use them naturally, "
+            "don't recite them):\n" + lines
+        )
+
+    # Save the user's message, then generate a reply with full context.
     await repo.add_message(db, session.id, user_id, "user", payload.message)
     provider = provider_factory.get_ai_provider()
-    reply = await provider.generate_reply(payload.message)
+    reply = await provider.generate_reply(
+        payload.message, history=history, memory_context=memory_context
+    )
     await repo.add_message(db, session.id, user_id, "assistant", reply)
     await repo.touch_session(db, session.id)
+
     # Capture the id before commit so we never read an expired attribute.
     session_id = session.id
     await db.commit()
+
+    # --- MEMORY: extract & save new facts (best-effort; never breaks chat) ---
+    try:
+        known = [m.content for m in memories]
+        extracted = await extract_memories(payload.message, reply, known)
+        if extracted:
+            await mem_repo.add_memories(db, str(user_id), extracted)
+            await db.commit()
+    except Exception:
+        await db.rollback()
+
     return ChatResponse(reply=reply, session_id=session_id)
 
 
