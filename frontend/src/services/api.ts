@@ -37,6 +37,7 @@ export type ThemeMode = "dark" | "light" | "system";
 export type ProfileData = {
   display_name: string | null;
   theme_preference?: ThemeMode;
+  theme_id?: string;
   avatar_url?: string | null;
 };
 
@@ -68,6 +69,10 @@ export async function updateThemePreference(
   mode: ThemeMode
 ): Promise<ProfileData> {
   return patchProfile({ theme_preference: mode });
+}
+
+export async function updateThemeId(themeId: string): Promise<ProfileData> {
+  return patchProfile({ theme_id: themeId });
 }
 
 export async function updateAvatarUrl(

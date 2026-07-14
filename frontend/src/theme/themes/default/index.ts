@@ -1,0 +1,43 @@
+import { ThemeDefinition } from "../../types";
+
+// Your original Saphin palettes, migrated verbatim. Nothing changed.
+export const defaultTheme: ThemeDefinition = {
+  id: "default",
+  name: "Saphin",
+  description: "The original Saphin look.",
+  emoji: "💜",
+  dark: {
+    background: "#0f1419",
+    surface: "#1a2230",
+    surfaceAlt: "rgba(255,255,255,0.10)",
+    textPrimary: "#ffffff",
+    textSecondary: "#8b8ba7",
+    accent: "#7c6cf0",
+    accentText: "#ffffff",
+    border: "rgba(255,255,255,0.10)",
+    danger: "#ef4444",
+    bubbleUser: "#6366f1",
+    bubbleUserText: "#ffffff",
+    bubbleCompanion: "#1e293b",
+    bubbleCompanionText: "#e2e8f0",
+    overlay: "rgba(0,0,0,0.55)",
+    isDark: true,
+  },
+  light: {
+    background: "#f4f5fb",
+    surface: "#ffffff",
+    surfaceAlt: "#eceef6",
+    textPrimary: "#1b1c2e",
+    textSecondary: "#6b7280",
+    accent: "#7c6cf0",
+    accentText: "#ffffff",
+    border: "rgba(0,0,0,0.08)",
+    danger: "#dc2626",
+    bubbleUser: "#7c6cf0",
+    bubbleUserText: "#ffffff",
+    bubbleCompanion: "#eceef6",
+    bubbleCompanionText: "#1b1c2e",
+    overlay: "rgba(0,0,0,0.35)",
+    isDark: false,
+  },
+};
