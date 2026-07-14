@@ -3,9 +3,10 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
-import { useColorScheme } from "react-native";
+import { useColorScheme, View, Animated, StyleSheet } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { updateThemePreference, updateThemeId } from "../services/api";
 import { ThemeDefinition, ThemeMode, ThemeVariant } from "./types";
@@ -22,7 +23,7 @@ type Ctx = {
   mode: ThemeMode;
   themeId: string;
   theme: ThemeVariant; // resolved flat tokens (what screens read)
-  definition: ThemeDefinition; // full theme (for animated bg/loader later)
+  definition: ThemeDefinition; // full theme (for animated bg/loader)
   themes: ThemeDefinition[];
   setMode: (m: ThemeMode) => void;
   setThemeId: (id: string) => void;
@@ -102,6 +103,22 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return effective === "light" ? definition.light : definition.dark;
   }, [mode, system, definition]);
 
+  // --- Smooth cross-fade whenever the look changes ---
+  const fade = useRef(new Animated.Value(0)).current;
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return; // no fade on initial launch
+    }
+    fade.setValue(1); // cover with the new background...
+    Animated.timing(fade, {
+      toValue: 0, // ...then reveal the new theme
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [theme.background, theme.bubbleUser, themeId]);
+
   const value = useMemo(
     () => ({
       mode,
@@ -116,8 +133,34 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     [mode, themeId, theme, definition, cacheLoaded, hadModeCache, hadThemeCache]
   );
 
+  // The current theme's optional animated background (waves for One Piece).
+  const Bg = definition.Background;
+
   return (
-    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+    <ThemeContext.Provider value={value}>
+      <View style={{ flex: 1 }}>
+        {/* base fill so transparent screens still show the theme color */}
+        <View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: theme.background }]}
+        />
+        {/* animated background layer (only if the theme provides one) */}
+        {Bg ? (
+          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+            <Bg isDark={theme.isDark} />
+          </View>
+        ) : null}
+        {children}
+        {/* cross-fade overlay on theme change */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: theme.background, opacity: fade },
+          ]}
+        />
+      </View>
+    </ThemeContext.Provider>
   );
 }
 

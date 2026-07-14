@@ -22,6 +22,7 @@ import {
   uploadAvatar,
 } from "../services/api";
 import { useTheme, ThemeMode } from "../context/ThemeContext";
+import { ThemePicker } from "../theme/components";
 import {
   isBiometricAvailable,
   isBiometricEnabled,
@@ -338,7 +339,7 @@ export default function ProfileScreen({ onClose }: Props) {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <View style={[styles.container, { backgroundColor: "transparent" }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onClose}>
           <Text style={[styles.back, { color: theme.accent }]}>‹ Back</Text>
@@ -435,6 +436,9 @@ export default function ProfileScreen({ onClose }: Props) {
             );
           })}
         </View>
+
+        <Text style={[styles.label, { color: theme.textSecondary }]}>Theme</Text>
+        <ThemePicker />
 
         <TouchableOpacity
           style={[
