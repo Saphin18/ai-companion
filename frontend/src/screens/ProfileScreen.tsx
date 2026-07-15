@@ -19,6 +19,7 @@ import {
   deleteAccount,
   getProfile,
   updateProfile,
+  updatePersonalityMode,
   uploadAvatar,
 } from "../services/api";
 import { useTheme, ThemeMode } from "../context/ThemeContext";
@@ -35,6 +36,13 @@ import {
 const RESET_REDIRECT_URL =
   "https://saphin-ai-backend.onrender.com/reset-password";
 
+const PERSONALITY_OPTIONS: { key: string; label: string; emoji: string }[] = [
+  { key: "balanced", label: "Balanced", emoji: "🙂" },
+  { key: "motivator", label: "Motivator", emoji: "💪" },
+  { key: "humor", label: "Humor", emoji: "😄" },
+  { key: "calm", label: "Calm", emoji: "🌿" },
+];
+
 type Props = {
   onClose: () => void;
 };
@@ -45,6 +53,7 @@ export default function ProfileScreen({ onClose }: Props) {
   const [savedName, setSavedName] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [personalityMode, setPersonalityMode] = useState<string>("balanced");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -79,6 +88,7 @@ export default function ProfileScreen({ onClose }: Props) {
         setName(n);
         setSavedName(n);
         setAvatarUrl(profile.avatar_url ?? null);
+        setPersonalityMode(profile.personality_mode ?? "balanced");
         const [available, enabled] = await Promise.all([
           isBiometricAvailable(),
           isBiometricEnabled(),
@@ -107,6 +117,19 @@ export default function ProfileScreen({ onClose }: Props) {
       Alert.alert("Error", "Could not save your name.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Personality picker: save instantly on tap, roll back on failure.
+  const handlePersonality = async (key: string) => {
+    if (key === personalityMode) return;
+    const prev = personalityMode;
+    setPersonalityMode(key);
+    try {
+      await updatePersonalityMode(key);
+    } catch {
+      setPersonalityMode(prev);
+      Alert.alert("Error", "Could not update the personality. Try again.");
     }
   };
 
@@ -439,6 +462,40 @@ export default function ProfileScreen({ onClose }: Props) {
 
         <Text style={[styles.label, { color: theme.textSecondary }]}>Theme</Text>
         <ThemePicker />
+
+        <Text style={[styles.label, { color: theme.textSecondary }]}>
+          Companion personality
+        </Text>
+        <View style={styles.personaWrap}>
+          {PERSONALITY_OPTIONS.map((opt) => {
+            const active = personalityMode === opt.key;
+            return (
+              <TouchableOpacity
+                key={opt.key}
+                style={[
+                  styles.personaPill,
+                  {
+                    backgroundColor: active ? theme.accent : theme.surface,
+                    borderColor: active ? theme.accent : theme.border,
+                  },
+                ]}
+                onPress={() => handlePersonality(opt.key)}
+              >
+                <Text
+                  style={[
+                    styles.personaText,
+                    { color: active ? theme.accentText : theme.textPrimary },
+                  ]}
+                >
+                  {opt.emoji}  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <Text style={[styles.personaHint, { color: theme.textSecondary }]}>
+          Changes how your companion talks. Your mood still gently adjusts the tone.
+        </Text>
 
         <TouchableOpacity
           style={[
@@ -840,6 +897,18 @@ const styles = StyleSheet.create({
   },
   segmentItem: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: "center" },
   segmentText: { fontSize: 14, fontWeight: "600" },
+
+  personaWrap: { flexDirection: "row", flexWrap: "wrap", marginTop: 4 },
+  personaPill: {
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  personaText: { fontSize: 14, fontWeight: "600" },
+  personaHint: { fontSize: 12, marginTop: 2, marginBottom: 4 },
 
   primaryBtn: { borderRadius: 12, padding: 16, alignItems: "center", marginTop: 24 },
   primaryText: { fontSize: 16, fontWeight: "700" },

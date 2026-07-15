@@ -38,6 +38,7 @@ export type ProfileData = {
   display_name: string | null;
   theme_preference?: ThemeMode;
   theme_id?: string;
+  personality_mode?: string;
   avatar_url?: string | null;
 };
 
@@ -73,6 +74,12 @@ export async function updateThemePreference(
 
 export async function updateThemeId(themeId: string): Promise<ProfileData> {
   return patchProfile({ theme_id: themeId });
+}
+
+export async function updatePersonalityMode(
+  mode: string
+): Promise<ProfileData> {
+  return patchProfile({ personality_mode: mode });
 }
 
 export async function updateAvatarUrl(

@@ -1,4 +1,4 @@
-﻿import { StyleSheet, Text, View } from 'react-native';
+﻿import { Linking, StyleSheet, Text, View } from 'react-native';
 import type { ChatMessage } from '../types/chat';
 import { useTheme } from '../context/ThemeContext';
 
@@ -6,9 +6,26 @@ interface Props {
   message: ChatMessage;
 }
 
+// Matches http:// or https:// URLs inside the message text.
+const URL_REGEX = /(https?:\/\/[^\s]+)/gi;
+
+// Trailing punctuation that usually belongs to the sentence, not the link.
+function splitTrailingPunctuation(url: string): [string, string] {
+  const match = url.match(/[.,!?)\]]+$/);
+  if (match) {
+    const trail = match[0];
+    return [url.slice(0, url.length - trail.length), trail];
+  }
+  return [url, ''];
+}
+
 export default function ChatBubble({ message }: Props) {
   const { theme } = useTheme();
   const isUser = message.role === 'user';
+  const textColor = isUser ? theme.bubbleUserText : theme.bubbleCompanionText;
+
+  // Break the text into plain segments and clickable link segments.
+  const parts = message.text.split(URL_REGEX);
 
   return (
     <View style={[styles.row, isUser ? styles.rowUser : styles.rowCompanion]}>
@@ -20,13 +37,27 @@ export default function ChatBubble({ message }: Props) {
             : [styles.bubbleCompanion, { backgroundColor: theme.bubbleCompanion }],
         ]}
       >
-        <Text
-          style={[
-            styles.text,
-            { color: isUser ? theme.bubbleUserText : theme.bubbleCompanionText },
-          ]}
-        >
-          {message.text}
+        <Text style={[styles.text, { color: textColor }]}>
+          {parts.map((part, index) => {
+            if (part && URL_REGEX.test(part)) {
+              // Reset lastIndex because the regex is global (stateful) on .test().
+              URL_REGEX.lastIndex = 0;
+              const [link, trailing] = splitTrailingPunctuation(part);
+              return (
+                <Text key={index}>
+                  <Text
+                    style={[styles.link, { color: theme.accent }]}
+                    onPress={() => Linking.openURL(link)}
+                  >
+                    {link}
+                  </Text>
+                  {trailing}
+                </Text>
+              );
+            }
+            URL_REGEX.lastIndex = 0;
+            return <Text key={index}>{part}</Text>;
+          })}
         </Text>
       </View>
     </View>
@@ -60,5 +91,9 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 15,
     lineHeight: 20,
+  },
+  link: {
+    textDecorationLine: 'underline',
+    fontWeight: '600',
   },
 });
