@@ -65,6 +65,9 @@ class Profile(Base):
     theme_id: Mapped[str] = mapped_column(
         Text, nullable=False, server_default="default"
     )
+    personality_mode: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="balanced"
+    )
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

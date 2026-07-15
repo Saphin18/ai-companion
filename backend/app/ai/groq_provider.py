@@ -33,14 +33,18 @@ class GroqProvider(AIProvider):
         *,
         history: list[dict] | None = None,
         memory_context: str | None = None,
+        personality_context: str | None = None,
         tone_context: str | None = None,
     ) -> str:
         # System prompt = base persona
-        #   + (optionally) what we remember about the user
-        #   + (optionally) the user's current emotional tone to adapt to.
+        #   + what we remember about the user (memory)
+        #   + the user's chosen personality mode
+        #   + the user's current emotional tone (mood nudge, applied last).
         system_content = COMPANION_SYSTEM_PROMPT
         if memory_context:
             system_content = f"{system_content}\n\n{memory_context}"
+        if personality_context:
+            system_content = f"{system_content}\n\n{personality_context}"
         if tone_context:
             system_content = f"{system_content}\n\n{tone_context}"
 

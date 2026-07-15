@@ -17,11 +17,30 @@ from app.models.chat import (
 from app.repositories import chat_repository as repo
 from app.repositories import memory_repository as mem_repo
 from app.repositories import mood_repository as mood_repo
+from app.repositories import profile_repository as prof_repo
 
 router = APIRouter()
 
 # How many recent messages of the CURRENT chat to feed back to the AI.
 HISTORY_LIMIT = 20
+
+# Personality-mode instruction blocks (Phase 3B). "balanced" adds nothing.
+PERSONALITY_PROMPTS = {
+    "motivator": (
+        "Personality mode: MOTIVATOR. Be upbeat and encouraging. Cheer the user on, "
+        "highlight their strengths and progress, and nudge them toward positive action "
+        "with concrete, doable next steps. Stay realistic and never dismiss their feelings."
+    ),
+    "humor": (
+        "Personality mode: HUMOR. Be playful, warm and lightly witty. Add gentle jokes or "
+        "fun observations where they fit. Keep it kind, never sarcastic at the user's "
+        "expense, and dial the humor down if they seem upset."
+    ),
+    "calm": (
+        "Personality mode: CALM. Be soothing, gentle and grounding. Use a slow, reassuring "
+        "tone and short, calming sentences to help the user feel settled and safe."
+    ),
+}
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -55,7 +74,12 @@ async def chat(
             "don't recite them):\n" + lines
         )
 
-    # --- MOOD (Phase 3): detect the user's current tone so the reply can adapt. ---
+    # --- PERSONALITY (Phase 3B): the user's chosen companion style. ---
+    profile = await prof_repo.get_profile(db, user_id)
+    mode = (profile.personality_mode if profile else "balanced") or "balanced"
+    personality_context = PERSONALITY_PROMPTS.get(mode)
+
+    # --- MOOD (Phase 3A): detect the user's current tone so the reply can adapt. ---
     # Best-effort: on any failure detect_mood returns None and we skip adaptation.
     mood_reading = await detect_mood(payload.message)
     tone_context = None
@@ -75,6 +99,7 @@ async def chat(
         payload.message,
         history=history,
         memory_context=memory_context,
+        personality_context=personality_context,
         tone_context=tone_context,
     )
     await repo.add_message(db, session.id, user_id, "assistant", reply)
@@ -94,7 +119,7 @@ async def chat(
     except Exception:
         await db.rollback()
 
-    # --- MOOD (Phase 3): log the detected mood (best-effort; never breaks chat) ---
+    # --- MOOD (Phase 3A): log the detected mood (best-effort; never breaks chat) ---
     if mood_reading:
         try:
             await mood_repo.add_mood_log(

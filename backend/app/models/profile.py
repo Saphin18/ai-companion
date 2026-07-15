@@ -7,6 +7,7 @@ class ProfileOut(BaseModel):
     display_name: str | None = None
     theme_preference: str = "system"
     theme_id: str = "default"
+    personality_mode: str = "balanced"
     avatar_url: str | None = None
 
 
@@ -14,4 +15,5 @@ class ProfileUpdate(BaseModel):
     display_name: str | None = None
     theme_preference: str | None = None
     theme_id: str | None = None
+    personality_mode: str | None = None
     avatar_url: str | None = None
