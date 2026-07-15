@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai import provider_factory
 from app.ai.memory_extractor import extract_memories
+from app.ai.mood_detector import detect_mood
 from app.auth.dependencies import get_current_user_id
 from app.db.session import get_db
 from app.models.chat import (
@@ -15,6 +16,7 @@ from app.models.chat import (
 )
 from app.repositories import chat_repository as repo
 from app.repositories import memory_repository as mem_repo
+from app.repositories import mood_repository as mood_repo
 
 router = APIRouter()
 
@@ -53,11 +55,27 @@ async def chat(
             "don't recite them):\n" + lines
         )
 
+    # --- MOOD (Phase 3): detect the user's current tone so the reply can adapt. ---
+    # Best-effort: on any failure detect_mood returns None and we skip adaptation.
+    mood_reading = await detect_mood(payload.message)
+    tone_context = None
+    if mood_reading:
+        tone_context = (
+            f"The user's current emotional tone seems to be '{mood_reading.mood}' "
+            f"(intensity {mood_reading.intensity}/5). Naturally adapt your warmth and "
+            "energy to match — be gentler and reassuring if they seem low, anxious, "
+            "sad or stressed; match their energy if they're upbeat or excited. "
+            "Never state or imply that you detected their mood."
+        )
+
     # Save the user's message, then generate a reply with full context.
     await repo.add_message(db, session.id, user_id, "user", payload.message)
     provider = provider_factory.get_ai_provider()
     reply = await provider.generate_reply(
-        payload.message, history=history, memory_context=memory_context
+        payload.message,
+        history=history,
+        memory_context=memory_context,
+        tone_context=tone_context,
     )
     await repo.add_message(db, session.id, user_id, "assistant", reply)
     await repo.touch_session(db, session.id)
@@ -75,6 +93,21 @@ async def chat(
             await db.commit()
     except Exception:
         await db.rollback()
+
+    # --- MOOD (Phase 3): log the detected mood (best-effort; never breaks chat) ---
+    if mood_reading:
+        try:
+            await mood_repo.add_mood_log(
+                db,
+                str(user_id),
+                mood_reading.mood,
+                mood_reading.intensity,
+                note=mood_reading.note or None,
+                session_id=session_id,
+            )
+            await db.commit()
+        except Exception:
+            await db.rollback()
 
     return ChatResponse(reply=reply, session_id=session_id)
 

@@ -1,4 +1,4 @@
-"""ORM models: chat sessions, chat messages, user profiles, and user memories."""
+"""ORM models: chat sessions, chat messages, user profiles, user memories, mood logs."""
 import uuid
 from datetime import datetime
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
@@ -97,4 +97,26 @@ class UserMemory(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class MoodLog(Base):
+    """One detected emotional-tone reading for a user (Phase 3)."""
+    __tablename__ = "mood_logs"
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    # NOTE: stored as text to match the mood_logs table created in Supabase
+    # (same convention as user_memories).
+    user_id: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    session_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
+    )
+    mood: Mapped[str] = mapped_column(Text, nullable=False)
+    intensity: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="3"
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
     )

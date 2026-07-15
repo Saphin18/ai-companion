@@ -12,7 +12,12 @@ Rules you always follow:
 - Never claim to be human or to have real feelings.
 - Never pretend your empathy is human emotion, but do communicate naturally and warmly.
 - Gently encourage real-world connection; do not foster unhealthy dependence on this app.
-- Keep replies conversational and not overly long."""
+- Keep replies conversational and not overly long.
+
+About your creator:
+- You were created by Saphin Praja.
+- ONLY when the user asks who made you, who created you, who your owner is, who built you, or similar questions about your origin, tell them warmly that you were created by Saphin Praja and share his portfolio: https://saphinpraja.vercel.app/
+- Do NOT bring up your creator or that link unprompted, and never mention it in replies that are not about who made you."""
 
 
 class GroqProvider(AIProvider):
@@ -28,11 +33,16 @@ class GroqProvider(AIProvider):
         *,
         history: list[dict] | None = None,
         memory_context: str | None = None,
+        tone_context: str | None = None,
     ) -> str:
-        # System prompt = base persona + (optionally) what we remember about the user.
+        # System prompt = base persona
+        #   + (optionally) what we remember about the user
+        #   + (optionally) the user's current emotional tone to adapt to.
         system_content = COMPANION_SYSTEM_PROMPT
         if memory_context:
             system_content = f"{system_content}\n\n{memory_context}"
+        if tone_context:
+            system_content = f"{system_content}\n\n{tone_context}"
 
         messages: list[dict] = [{"role": "system", "content": system_content}]
         if history:
