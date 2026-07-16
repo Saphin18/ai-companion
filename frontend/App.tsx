@@ -23,11 +23,13 @@ import LockScreen from "./src/screens/LockScreen";
 import ChatsListScreen from "./src/screens/ChatsListScreen";
 import ChatScreen from "./src/screens/ChatScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
+import JournalScreen from "./src/screens/JournalScreen";
 
 type View3 =
   | { name: "list" }
   | { name: "chat"; sessionId: string | null }
-  | { name: "profile" };
+  | { name: "profile" }
+  | { name: "journal" };
 
 // On login: adopt the server's theme (if this device has none saved), and
 // copy the signup name into the profile if it's still missing.
@@ -136,7 +138,11 @@ function Root() {
   // only exit the app when already on the list.
   useEffect(() => {
     const onBackPress = () => {
-      if (view.name === "chat" || view.name === "profile") {
+      if (
+        view.name === "chat" ||
+        view.name === "profile" ||
+        view.name === "journal"
+      ) {
         setView({ name: "list" });
         return true;
       }
@@ -193,6 +199,8 @@ function Root() {
   let content;
   if (view.name === "profile") {
     content = <ProfileScreen onClose={() => setView({ name: "list" })} />;
+  } else if (view.name === "journal") {
+    content = <JournalScreen onBack={() => setView({ name: "list" })} />;
   } else if (view.name === "chat") {
     content = (
       <ChatScreen
@@ -205,6 +213,7 @@ function Root() {
       <ChatsListScreen
         onOpenChat={(sessionId) => setView({ name: "chat", sessionId })}
         onOpenProfile={() => setView({ name: "profile" })}
+        onOpenJournal={() => setView({ name: "journal" })}
       />
     );
   }

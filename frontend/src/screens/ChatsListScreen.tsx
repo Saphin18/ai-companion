@@ -26,6 +26,7 @@ import { useTheme } from "../context/ThemeContext";
 type Props = {
   onOpenChat: (sessionId: string | null) => void;
   onOpenProfile: () => void;
+  onOpenJournal: () => void;
 };
 
 function sortSessions(list: SessionSummary[]): SessionSummary[] {
@@ -35,7 +36,11 @@ function sortSessions(list: SessionSummary[]): SessionSummary[] {
   });
 }
 
-export default function ChatsListScreen({ onOpenChat, onOpenProfile }: Props) {
+export default function ChatsListScreen({
+  onOpenChat,
+  onOpenProfile,
+  onOpenJournal,
+}: Props) {
   const { theme } = useTheme();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,6 +173,15 @@ export default function ChatsListScreen({ onOpenChat, onOpenProfile }: Props) {
       >
         <Text style={[styles.newBtnText, { color: theme.accentText }]}>
           + New chat
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.journalBtn, { borderColor: theme.accent }]}
+        onPress={onOpenJournal}
+      >
+        <Text style={[styles.journalBtnText, { color: theme.accent }]}>
+          📖  Journal
         </Text>
       </TouchableOpacity>
 
@@ -342,9 +356,20 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 15,
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 10,
   },
   newBtnText: { fontSize: 16, fontWeight: "700" },
+
+  journalBtn: {
+    marginHorizontal: 20,
+    borderRadius: 14,
+    padding: 14,
+    alignItems: "center",
+    marginBottom: 20,
+    borderWidth: 1,
+  },
+  journalBtnText: { fontSize: 16, fontWeight: "700" },
+
   empty: { textAlign: "center", marginTop: 40, fontSize: 15 },
   row: {
     flexDirection: "row",

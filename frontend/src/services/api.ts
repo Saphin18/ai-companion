@@ -207,3 +207,30 @@ export async function deleteAccount(): Promise<void> {
     throw new Error(`Delete account failed: ${res.status}`);
   }
 }
+
+export type JournalEntry = {
+  id: string;
+  content: string;
+  reflection: string | null;
+  created_at: string;
+};
+
+export async function createJournalEntry(
+  content: string
+): Promise<JournalEntry> {
+  const res = await fetch(`${API_URL}/journal`, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) throw new Error(`Journal save failed: ${res.status}`);
+  return res.json();
+}
+
+export async function listJournalEntries(): Promise<JournalEntry[]> {
+  const res = await fetch(`${API_URL}/journal`, {
+    headers: await authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Journal load failed: ${res.status}`);
+  return res.json();
+}
