@@ -1,10 +1,16 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  BackHandler,
+  Dimensions,
   FlatList,
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -25,11 +31,16 @@ import { useTheme } from "../context/ThemeContext";
 
 type Props = {
   onOpenChat: (sessionId: string | null) => void;
+  onStartChatWithMessage: (text: string) => void;
   onOpenProfile: () => void;
   onOpenJournal: () => void;
   onOpenReminders: () => void;
   onOpenGoals: () => void;
+  onOpenAbout: () => void;
 };
+
+const SCREEN_W = Dimensions.get("window").width;
+const DRAWER_W = Math.min(320, SCREEN_W * 0.82);
 
 function sortSessions(list: SessionSummary[]): SessionSummary[] {
   return [...list].sort((a, b) => {
@@ -40,16 +51,25 @@ function sortSessions(list: SessionSummary[]): SessionSummary[] {
 
 export default function ChatsListScreen({
   onOpenChat,
+  onStartChatWithMessage,
   onOpenProfile,
   onOpenJournal,
   onOpenReminders,
   onOpenGoals,
+  onOpenAbout,
 }: Props) {
   const { theme } = useTheme();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [initial, setInitial] = useState("?");
+  const [displayName, setDisplayName] = useState("");
+
+  const [draft, setDraft] = useState("");
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const slide = useRef(new Animated.Value(-DRAWER_W)).current;
+  const fade = useRef(new Animated.Value(0)).current;
 
   const [menuFor, setMenuFor] = useState<SessionSummary | null>(null);
   const [renameFor, setRenameFor] = useState<SessionSummary | null>(null);
@@ -65,22 +85,64 @@ export default function ChatsListScreen({
       } finally {
         setLoading(false);
       }
-      // Load avatar + initial for the header button.
       try {
         const { data } = await supabase.auth.getUser();
         const profile = await getProfile();
         setAvatarUrl(profile.avatar_url ?? null);
-        const src = (profile.display_name || data.user?.email || "?").trim();
-        setInitial((src[0] || "?").toUpperCase());
+        const name = (profile.display_name || data.user?.email || "").trim();
+        setDisplayName(name || "friend");
+        setInitial((name[0] || "?").toUpperCase());
       } catch (e) {
         console.warn(e);
       }
     })();
   }, []);
 
+  const openDrawer = () => {
+    setDrawerOpen(true);
+    Animated.parallel([
+      Animated.timing(slide, { toValue: 0, duration: 220, useNativeDriver: true }),
+      Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const closeDrawer = (after?: () => void) => {
+    Animated.parallel([
+      Animated.timing(slide, {
+        toValue: -DRAWER_W,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fade, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start(() => {
+      setDrawerOpen(false);
+      if (after) after();
+    });
+  };
+
+  useEffect(() => {
+    const onBack = () => {
+      if (drawerOpen) {
+        closeDrawer();
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBack);
+    return () => sub.remove();
+  }, [drawerOpen]);
+
   const formatDate = (iso: string) => {
     const d = new Date(iso);
     return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  };
+
+  const sendDraft = () => {
+    const t = draft.trim();
+    if (!t) return;
+    Keyboard.dismiss();
+    setDraft("");
+    onStartChatWithMessage(t);
   };
 
   const handleTogglePin = async (item: SessionSummary) => {
@@ -152,12 +214,23 @@ export default function ChatsListScreen({
     ]);
   };
 
-  return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+  const drawerItem = (label: string, onPress: () => void) => (
+    <TouchableOpacity
+      style={styles.drawerItem}
+      onPress={() => closeDrawer(onPress)}
+    >
+      <Text style={[styles.drawerItemText, { color: theme.textPrimary }]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const homeBody = (
+    <View style={{ flex: 1 }}>
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
-          Your Chats
-        </Text>
+        <TouchableOpacity onPress={openDrawer} hitSlop={12}>
+          <Text style={[styles.menuIcon, { color: theme.textPrimary }]}>≡</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={onOpenProfile}>
           {avatarUrl ? (
             <Image source={{ uri: avatarUrl }} style={styles.headerAvatarImg} />
@@ -171,73 +244,137 @@ export default function ChatsListScreen({
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={[styles.newBtn, { backgroundColor: theme.accent }]}
-        onPress={() => onOpenChat(null)}
-      >
-        <Text style={[styles.newBtnText, { color: theme.accentText }]}>
-          + New chat
+      <View style={styles.greetWrap}>
+        <Text style={[styles.greetHi, { color: theme.textPrimary }]}>
+          Hey {displayName.split(" ")[0]},
         </Text>
-      </TouchableOpacity>
+        <Text style={[styles.greetSub, { color: theme.textSecondary }]}>
+          how are you feeling today?
+        </Text>
+      </View>
 
-      <TouchableOpacity
-        style={[styles.journalBtn, { borderColor: theme.accent }]}
-        onPress={onOpenJournal}
+      <View
+        style={[
+          styles.inputBar,
+          { backgroundColor: theme.surface, borderColor: theme.border },
+        ]}
       >
-        <Text style={[styles.journalBtnText, { color: theme.accent }]}>
-          📖  Journal
-        </Text>
-      </TouchableOpacity>
+        <TextInput
+          style={[styles.input, { color: theme.textPrimary }]}
+          value={draft}
+          onChangeText={setDraft}
+          placeholder="Chat with Saphin…"
+          placeholderTextColor={theme.textSecondary}
+          multiline
+          returnKeyType="send"
+          onSubmitEditing={sendDraft}
+          blurOnSubmit
+        />
+        <TouchableOpacity
+          onPress={sendDraft}
+          disabled={!draft.trim()}
+          style={[
+            styles.sendBtn,
+            { backgroundColor: draft.trim() ? theme.accent : theme.border },
+          ]}
+        >
+          <Text style={{ color: theme.accentText, fontSize: 18, fontWeight: "700" }}>
+            ↑
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
-      <TouchableOpacity
-        style={[styles.journalBtn, { borderColor: theme.accent }]}
-        onPress={onOpenReminders}
-      >
-        <Text style={[styles.journalBtnText, { color: theme.accent }]}>
-          ⏰  Reminders
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.journalBtn, { borderColor: theme.accent }]}
-        onPress={onOpenGoals}
-      >
-        <Text style={[styles.journalBtnText, { color: theme.accent }]}>
-          🎯  Goals
-        </Text>
-      </TouchableOpacity>
-
-      {loading ? (
-        <ActivityIndicator color={theme.accent} style={{ marginTop: 40 }} />
-      ) : sessions.length === 0 ? (
-        <Text style={[styles.empty, { color: theme.textSecondary }]}>
-          No chats yet. Start a new one above.
-        </Text>
+  return (
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {Platform.OS === "ios" ? (
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+          {homeBody}
+        </KeyboardAvoidingView>
       ) : (
-        <FlatList
-          data={sessions}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: 20 }}
-          renderItem={({ item }) => (
+        homeBody
+      )}
+
+      {/* ===== Drawer ===== */}
+      {drawerOpen && (
+        <View style={StyleSheet.absoluteFill}>
+          <Animated.View
+            style={[styles.backdrop, { opacity: fade }]}
+          >
+            <Pressable style={{ flex: 1 }} onPress={() => closeDrawer()} />
+          </Animated.View>
+
+          <Animated.View
+            style={[
+              styles.drawer,
+              {
+                width: DRAWER_W,
+                backgroundColor: theme.surface,
+                transform: [{ translateX: slide }],
+              },
+            ]}
+          >
+            <Text style={[styles.drawerBrand, { color: theme.textPrimary }]}>
+              Saphin AI
+            </Text>
+
             <TouchableOpacity
-              style={[styles.row, { backgroundColor: theme.surface }]}
-              onPress={() => onOpenChat(item.id)}
-              onLongPress={() => setMenuFor(item)}
-              delayLongPress={250}
+              style={styles.drawerItem}
+              onPress={() => closeDrawer(() => onOpenChat(null))}
             >
-              {item.pinned && <Text style={styles.pin}>📌</Text>}
-              <Text
-                style={[styles.rowTitle, { color: theme.textPrimary }]}
-                numberOfLines={1}
-              >
-                {item.title || "New chat"}
-              </Text>
-              <Text style={[styles.rowDate, { color: theme.textSecondary }]}>
-                {formatDate(item.updated_at)}
+              <Text style={[styles.drawerItemText, { color: theme.accent, fontWeight: "700" }]}>
+                ＋  New chat
               </Text>
             </TouchableOpacity>
-          )}
-        />
+
+            <View style={[styles.drawerDivider, { backgroundColor: theme.border }]} />
+
+            {drawerItem("📖  Journal", onOpenJournal)}
+            {drawerItem("⏰  Reminders", onOpenReminders)}
+            {drawerItem("🎯  Goals", onOpenGoals)}
+            {drawerItem("ℹ️  About", onOpenAbout)}
+
+            <View style={[styles.drawerDivider, { backgroundColor: theme.border }]} />
+            <Text style={[styles.recentsLabel, { color: theme.textSecondary }]}>
+              Recents
+            </Text>
+
+            {loading ? (
+              <ActivityIndicator color={theme.accent} style={{ marginTop: 20 }} />
+            ) : sessions.length === 0 ? (
+              <Text style={[styles.emptyDrawer, { color: theme.textSecondary }]}>
+                No chats yet.
+              </Text>
+            ) : (
+              <FlatList
+                data={sessions}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={{ paddingBottom: 20 }}
+                keyboardShouldPersistTaps="handled"
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.recentRow}
+                    onPress={() => closeDrawer(() => onOpenChat(item.id))}
+                    onLongPress={() => setMenuFor(item)}
+                    delayLongPress={250}
+                  >
+                    {item.pinned && <Text style={styles.pin}>📌</Text>}
+                    <Text
+                      style={[styles.recentTitle, { color: theme.textPrimary }]}
+                      numberOfLines={1}
+                    >
+                      {item.title || "New chat"}
+                    </Text>
+                    <Text style={[styles.recentDate, { color: theme.textSecondary }]}>
+                      {formatDate(item.updated_at)}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+          </Animated.View>
+        </View>
       )}
 
       {/* Action menu */}
@@ -362,7 +499,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 16,
   },
-  headerTitle: { fontSize: 24, fontWeight: "700" },
+  menuIcon: { fontSize: 30, fontWeight: "400" },
   headerAvatar: {
     width: 40,
     height: 40,
@@ -373,38 +510,57 @@ const styles = StyleSheet.create({
   headerAvatarText: { fontSize: 18, fontWeight: "700" },
   headerAvatarImg: { width: 40, height: 40, borderRadius: 20 },
 
-  newBtn: {
-    marginHorizontal: 20,
-    borderRadius: 14,
-    padding: 15,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  newBtnText: { fontSize: 16, fontWeight: "700" },
+  greetWrap: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 24 },
+  greetHi: { fontSize: 26, fontWeight: "700", textAlign: "center" },
+  greetSub: { fontSize: 17, marginTop: 6, textAlign: "center" },
 
-  journalBtn: {
-    marginHorizontal: 20,
-    borderRadius: 14,
-    padding: 14,
-    alignItems: "center",
-    marginBottom: 20,
+  inputBar: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    marginHorizontal: 16,
+    marginBottom: 18,
     borderWidth: 1,
+    borderRadius: 24,
+    paddingLeft: 18,
+    paddingRight: 6,
+    paddingVertical: 6,
   },
-  journalBtnText: { fontSize: 16, fontWeight: "700" },
+  input: { flex: 1, fontSize: 16, maxHeight: 120, paddingVertical: 8 },
+  sendBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
+    marginBottom: 2,
+  },
 
-  empty: { textAlign: "center", marginTop: 40, fontSize: 15 },
-  row: {
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.45)" },
+  drawer: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    paddingTop: 56,
+    paddingHorizontal: 14,
+  },
+  drawerBrand: { fontSize: 22, fontWeight: "700", marginBottom: 14, paddingHorizontal: 6 },
+  drawerItem: { paddingVertical: 12, paddingHorizontal: 6 },
+  drawerItemText: { fontSize: 16 },
+  drawerDivider: { height: 1, marginVertical: 8 },
+  recentsLabel: { fontSize: 12, letterSpacing: 1, paddingHorizontal: 6, marginBottom: 6 },
+  emptyDrawer: { fontSize: 14, paddingHorizontal: 6, marginTop: 10 },
+  recentRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginHorizontal: 20,
-    marginBottom: 10,
-    borderRadius: 14,
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
   },
-  pin: { fontSize: 13, marginRight: 8 },
-  rowTitle: { fontSize: 16, flex: 1, marginRight: 10 },
-  rowDate: { fontSize: 13 },
+  pin: { fontSize: 12, marginRight: 6 },
+  recentTitle: { fontSize: 15, flex: 1, marginRight: 8 },
+  recentDate: { fontSize: 12 },
 
   overlay: { flex: 1, justifyContent: "center", padding: 28 },
   sheet: { borderRadius: 18, paddingVertical: 8, overflow: "hidden" },
@@ -435,3 +591,4 @@ const styles = StyleSheet.create({
   },
   renameSaveText: { fontSize: 15, fontWeight: "700" },
 });
+

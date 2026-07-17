@@ -31,17 +31,17 @@ import ProfileScreen from "./src/screens/ProfileScreen";
 import JournalScreen from "./src/screens/JournalScreen";
 import RemindersScreen from "./src/screens/RemindersScreen";
 import GoalsScreen from "./src/screens/GoalsScreen";
+import AboutScreen from "./src/screens/AboutScreen";
 
 type View3 =
   | { name: "list" }
-  | { name: "chat"; sessionId: string | null }
+  | { name: "chat"; sessionId: string | null; initialMessage?: string | null }
   | { name: "profile" }
   | { name: "journal" }
   | { name: "reminders" }
-  | { name: "goals" };
+  | { name: "goals" }
+  | { name: "about" };
 
-// On login: adopt the server's theme (if this device has none saved), and
-// copy the signup name into the profile if it's still missing.
 async function syncProfile(
   session: Session,
   hydrateFromServer: (m?: any) => void
@@ -60,8 +60,6 @@ async function syncProfile(
   }
 }
 
-// Best-effort: make sure this device is registered to receive push check-ins.
-// Never blocks or breaks login if permission is denied or offline.
 async function syncPushToken() {
   try {
     await ensureAndroidChannel();
@@ -74,14 +72,12 @@ async function syncPushToken() {
   }
 }
 
-// After a fresh password login, offer to turn on biometric quick-unlock —
-// but only once (never asked before) and only on capable devices.
 async function maybeOfferBiometric() {
   try {
     const available = await isBiometricAvailable();
     if (!available) return;
     const enabled = await isBiometricEnabled();
-    if (enabled) return; // already on — nothing to offer
+    if (enabled) return;
     Alert.alert(
       "Enable quick unlock?",
       "You can turn on fingerprint or face unlock anytime in Profile, under Security.",
@@ -114,7 +110,7 @@ function Root() {
           ]);
           if (enabled && available) setLocked(true);
         } catch {
-          // ignore — fall back to no lock
+          // ignore
         }
       }
       setReady(true);
@@ -124,7 +120,7 @@ function Root() {
       setSession(s);
       setView({ name: "list" });
       if (s && event === "SIGNED_IN") {
-        setLocked(false); // just logged in with password — already authenticated
+        setLocked(false);
         syncProfile(s, hydrateFromServer);
         syncPushToken();
         maybeOfferBiometric();
@@ -133,7 +129,6 @@ function Root() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // When a daily check-in notification is tapped, open a fresh chat.
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
       const type = resp.notification.request.content.data?.type;
@@ -144,8 +139,6 @@ function Root() {
     return () => sub.remove();
   }, []);
 
-  // Re-lock when the app returns from a true background (not the brief flicker
-  // the biometric prompt itself causes — that's why we check prev === background).
   useEffect(() => {
     const sub = AppState.addEventListener("change", async (next) => {
       const prev = appState.current;
@@ -167,8 +160,6 @@ function Root() {
     return () => sub.remove();
   }, [session]);
 
-  // Android hardware/gesture back: go to the Chats list from any sub-screen;
-  // only exit the app when already on the list.
   useEffect(() => {
     const onBackPress = () => {
       if (
@@ -176,7 +167,8 @@ function Root() {
         view.name === "profile" ||
         view.name === "journal" ||
         view.name === "reminders" ||
-        view.name === "goals"
+        view.name === "goals" ||
+        view.name === "about"
       ) {
         setView({ name: "list" });
         return true;
@@ -240,10 +232,13 @@ function Root() {
     content = <RemindersScreen onBack={() => setView({ name: "list" })} />;
   } else if (view.name === "goals") {
     content = <GoalsScreen onBack={() => setView({ name: "list" })} />;
+  } else if (view.name === "about") {
+    content = <AboutScreen onBack={() => setView({ name: "list" })} />;
   } else if (view.name === "chat") {
     content = (
       <ChatScreen
         sessionId={view.sessionId}
+        initialMessage={view.initialMessage ?? null}
         onBack={() => setView({ name: "list" })}
       />
     );
@@ -251,10 +246,14 @@ function Root() {
     content = (
       <ChatsListScreen
         onOpenChat={(sessionId) => setView({ name: "chat", sessionId })}
+        onStartChatWithMessage={(text) =>
+          setView({ name: "chat", sessionId: null, initialMessage: text })
+        }
         onOpenProfile={() => setView({ name: "profile" })}
         onOpenJournal={() => setView({ name: "journal" })}
         onOpenReminders={() => setView({ name: "reminders" })}
         onOpenGoals={() => setView({ name: "goals" })}
+        onOpenAbout={() => setView({ name: "about" })}
       />
     );
   }
@@ -274,4 +273,3 @@ export default function App() {
     </ThemeProvider>
   );
 }
-

@@ -19,6 +19,7 @@ import { useTheme } from "../context/ThemeContext";
 type Props = {
   sessionId: string | null;
   onBack: () => void;
+  initialMessage?: string | null;
 };
 
 const WELCOME: ChatMessage = {
@@ -28,7 +29,7 @@ const WELCOME: ChatMessage = {
   createdAt: Date.now(),
 };
 
-export default function ChatScreen({ sessionId, onBack }: Props) {
+export default function ChatScreen({ sessionId, onBack, initialMessage }: Props) {
   const { theme } = useTheme();
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
   const [currentSession, setCurrentSession] = useState<string | null>(sessionId);
@@ -72,6 +73,20 @@ export default function ChatScreen({ sessionId, onBack }: Props) {
       }
     })();
   }, [sessionId]);
+
+  const sentInitial = useRef(false);
+  useEffect(() => {
+    if (
+      !sentInitial.current &&
+      initialMessage &&
+      initialMessage.trim() &&
+      sessionId === null
+    ) {
+      sentInitial.current = true;
+      handleSend(initialMessage.trim());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMessage]);
 
   const handleSend = async (text: string) => {
     const userMsg: ChatMessage = {
