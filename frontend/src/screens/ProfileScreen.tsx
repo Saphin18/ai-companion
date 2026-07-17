@@ -154,34 +154,36 @@ export default function ProfileScreen({ onClose }: Props) {
   const persistCheckin = async (enabled: boolean, when: Date) => {
     setCheckinBusy(true);
     try {
-      if (enabled) {
-        const granted = await reqNotifPermission();
-        if (!granted) {
-          Alert.alert(
-            "Notifications are off",
-            "Turn on notifications for Saphin AI to receive daily check-ins."
-          );
-          setCheckinEnabled(false);
-          setCheckinBusy(false);
-          return;
-        }
-        await ensureAndroidChannel();
-        const token = await getExpoPushToken();
-        if (token) {
-          try {
-            await registerPushToken(token, Platform.OS);
-          } catch {
-            // best-effort
-          }
-        }
-      }
+      // 1) Always save the user's preference first — this is their choice and
+      //    must stick regardless of notification permission or token status.
       await updateCheckinSettings({
         checkin_enabled: enabled,
         checkin_hour: when.getHours(),
         checkin_minute: when.getMinutes(),
         checkin_tz_offset_minutes: new Date().getTimezoneOffset(),
       });
+
+      // 2) If turning on, try (best-effort) to register this device for pushes.
+      //    Any failure here does NOT undo the saved preference.
+      if (enabled) {
+        try {
+          const granted = await reqNotifPermission();
+          if (granted) {
+            await ensureAndroidChannel();
+            const token = await getExpoPushToken();
+            if (token) await registerPushToken(token, Platform.OS);
+          } else {
+            Alert.alert(
+              "Heads up",
+              "Check-in is on, but notifications are turned off for Saphin AI. Enable them in your phone settings to actually receive the daily note."
+            );
+          }
+        } catch {
+          // token/permission not available right now — the app re-tries on next login.
+        }
+      }
     } catch (e) {
+      // Only a real save failure flips the toggle back.
       Alert.alert("Error", "Could not save your check-in setting.");
       setCheckinEnabled(!enabled);
     } finally {
@@ -1111,6 +1113,7 @@ const styles = StyleSheet.create({
   pickCancel: { paddingVertical: 12, alignItems: "center", marginTop: 2 },
   pickCancelText: { fontSize: 15, fontWeight: "600" },
 });
+
 
 
 
