@@ -239,7 +239,7 @@ export async function listJournalEntries(): Promise<JournalEntry[]> {
   return res.json();
 }
 // ---------------------------------------------------------------------------
-// Phase 4 â€” Proactivity (push check-in, reminders, goals)
+// Phase 4 - Proactivity (push check-in, reminders, goals)
 // ---------------------------------------------------------------------------
 
 // 4B: register this device's Expo push token with the backend.
@@ -354,4 +354,5 @@ export async function updateGoal(
   });
   if (!res.ok) throw new Error(`Goal update failed: ${res.status}`);
 }
+
 

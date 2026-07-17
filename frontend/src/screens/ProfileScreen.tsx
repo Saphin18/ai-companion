@@ -47,10 +47,10 @@ const RESET_REDIRECT_URL =
   "https://saphin-ai-backend.onrender.com/reset-password";
 
 const PERSONALITY_OPTIONS: { key: string; label: string; emoji: string }[] = [
-  { key: "balanced", label: "Balanced", emoji: "ðŸ™‚" },
-  { key: "motivator", label: "Motivator", emoji: "ðŸ’ª" },
-  { key: "humor", label: "Humor", emoji: "ðŸ˜„" },
-  { key: "calm", label: "Calm", emoji: "ðŸŒ¿" },
+  { key: "balanced", label: "Balanced", emoji: "🙂" },
+  { key: "motivator", label: "Motivator", emoji: "💪" },
+  { key: "humor", label: "Humor", emoji: "😄" },
+  { key: "calm", label: "Calm", emoji: "🌿" },
 ];
 
 type Props = {
@@ -294,7 +294,7 @@ export default function ProfileScreen({ onClose }: Props) {
       if (signInError) {
         Alert.alert(
           "Wrong current password",
-          "Your current password is incorrect. If you've forgotten it, tap â€œForgot password?â€."
+          "Your current password is incorrect. If you've forgotten it, tap 'Forgot password?'."
         );
         setChangingPw(false);
         return;
@@ -426,7 +426,7 @@ export default function ProfileScreen({ onClose }: Props) {
     <View style={[styles.container, { backgroundColor: "transparent" }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onClose}>
-          <Text style={[styles.back, { color: theme.accent }]}>â€¹ Back</Text>
+          <Text style={[styles.back, { color: theme.accent }]}>‹ Back</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Profile</Text>
         <View style={{ width: 50 }} />
@@ -468,7 +468,7 @@ export default function ProfileScreen({ onClose }: Props) {
                 { backgroundColor: theme.surface, borderColor: theme.background },
               ]}
             >
-              <Text style={styles.cameraIcon}>ðŸ“·</Text>
+              <Text style={styles.cameraIcon}>📷</Text>
             </View>
           </TouchableOpacity>
           <Text style={[styles.avatarHint, { color: theme.textSecondary }]}>
@@ -725,7 +725,7 @@ export default function ProfileScreen({ onClose }: Props) {
               onPress={takePhoto}
             >
               <Text style={[styles.pickItemText, { color: theme.accentText }]}>
-                ðŸ“·  Take a photo
+                📷  Take a photo
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -733,7 +733,7 @@ export default function ProfileScreen({ onClose }: Props) {
               onPress={pickFromGallery}
             >
               <Text style={[styles.pickItemText, { color: theme.textPrimary }]}>
-                ðŸ–¼  Choose from gallery
+                🖼  Choose from gallery
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -1111,3 +1111,8 @@ const styles = StyleSheet.create({
   pickCancel: { paddingVertical: 12, alignItems: "center", marginTop: 2 },
   pickCancelText: { fontSize: 15, fontWeight: "600" },
 });
+
+
+
+
+
