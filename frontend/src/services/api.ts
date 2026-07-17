@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+﻿import { supabase } from "./supabase";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL as string;
 
@@ -40,6 +40,10 @@ export type ProfileData = {
   theme_id?: string;
   personality_mode?: string;
   avatar_url?: string | null;
+  checkin_enabled?: boolean;
+  checkin_hour?: number;
+  checkin_minute?: number;
+  checkin_tz_offset_minutes?: number;
 };
 
 export async function getProfile(): Promise<ProfileData> {
@@ -234,3 +238,120 @@ export async function listJournalEntries(): Promise<JournalEntry[]> {
   if (!res.ok) throw new Error(`Journal load failed: ${res.status}`);
   return res.json();
 }
+// ---------------------------------------------------------------------------
+// Phase 4 â€” Proactivity (push check-in, reminders, goals)
+// ---------------------------------------------------------------------------
+
+// 4B: register this device's Expo push token with the backend.
+export async function registerPushToken(
+  token: string,
+  platform: string | null
+): Promise<void> {
+  const res = await fetch(`${API_URL}/push/register`, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify({ token, platform }),
+  });
+  if (!res.ok) throw new Error(`Push register failed: ${res.status}`);
+}
+
+// 4B: daily check-in settings live on the profile. Extend the update helpers.
+export type CheckinSettings = {
+  checkin_enabled: boolean;
+  checkin_hour: number;
+  checkin_minute: number;
+  checkin_tz_offset_minutes: number;
+};
+
+export async function updateCheckinSettings(
+  settings: Partial<CheckinSettings>
+): Promise<ProfileData> {
+  return patchProfile(settings);
+}
+
+// 4C: reminders (saved on the server; scheduled locally on the device).
+export type Reminder = {
+  id: string;
+  title: string;
+  remind_at: string | null;
+  repeats_daily: boolean;
+  local_notif_id: string | null;
+  is_active: boolean;
+  created_at: string;
+};
+
+export async function createReminder(input: {
+  title: string;
+  remind_at: string | null;
+  repeats_daily: boolean;
+  local_notif_id: string | null;
+}): Promise<Reminder> {
+  const res = await fetch(`${API_URL}/reminders`, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`Reminder save failed: ${res.status}`);
+  return res.json();
+}
+
+export async function listReminders(): Promise<Reminder[]> {
+  const res = await fetch(`${API_URL}/reminders`, {
+    headers: await authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Reminders load failed: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteReminder(id: string): Promise<void> {
+  const res = await fetch(`${API_URL}/reminders/${id}`, {
+    method: "DELETE",
+    headers: await authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Reminder delete failed: ${res.status}`);
+}
+
+// 4D: goals (injected into chat so the companion encourages them).
+export type Goal = {
+  id: string;
+  title: string;
+  detail: string | null;
+  status: string;
+  created_at: string;
+  completed_at: string | null;
+};
+
+export async function createGoal(input: {
+  title: string;
+  detail: string | null;
+}): Promise<Goal> {
+  const res = await fetch(`${API_URL}/goals`, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`Goal save failed: ${res.status}`);
+  return res.json();
+}
+
+export async function listGoals(status?: string): Promise<Goal[]> {
+  const url = status
+    ? `${API_URL}/goals?status=${encodeURIComponent(status)}`
+    : `${API_URL}/goals`;
+  const res = await fetch(url, { headers: await authHeaders() });
+  if (!res.ok) throw new Error(`Goals load failed: ${res.status}`);
+  return res.json();
+}
+
+export async function updateGoal(
+  id: string,
+  patch: { status?: string; title?: string; detail?: string | null }
+): Promise<void> {
+  const res = await fetch(`${API_URL}/goals/${id}`, {
+    method: "PATCH",
+    headers: await authHeaders(),
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(`Goal update failed: ${res.status}`);
+}
+

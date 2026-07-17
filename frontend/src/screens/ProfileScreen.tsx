@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,7 +13,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Platform } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { supabase } from "../services/supabase";
 import {
   deleteAccount,
@@ -21,7 +23,15 @@ import {
   updateProfile,
   updatePersonalityMode,
   uploadAvatar,
+  getProfile as _getProfileUnused,
+  updateCheckinSettings,
 } from "../services/api";
+import {
+  requestPermission as reqNotifPermission,
+  ensureAndroidChannel,
+  getExpoPushToken,
+} from "../services/notifications";
+import { registerPushToken } from "../services/api";
 import { useTheme, ThemeMode } from "../context/ThemeContext";
 import { ThemePicker } from "../theme/components";
 import {
@@ -37,10 +47,10 @@ const RESET_REDIRECT_URL =
   "https://saphin-ai-backend.onrender.com/reset-password";
 
 const PERSONALITY_OPTIONS: { key: string; label: string; emoji: string }[] = [
-  { key: "balanced", label: "Balanced", emoji: "🙂" },
-  { key: "motivator", label: "Motivator", emoji: "💪" },
-  { key: "humor", label: "Humor", emoji: "😄" },
-  { key: "calm", label: "Calm", emoji: "🌿" },
+  { key: "balanced", label: "Balanced", emoji: "ðŸ™‚" },
+  { key: "motivator", label: "Motivator", emoji: "ðŸ’ª" },
+  { key: "humor", label: "Humor", emoji: "ðŸ˜„" },
+  { key: "calm", label: "Calm", emoji: "ðŸŒ¿" },
 ];
 
 type Props = {
@@ -54,6 +64,10 @@ export default function ProfileScreen({ onClose }: Props) {
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [personalityMode, setPersonalityMode] = useState<string>("balanced");
+  const [checkinEnabled, setCheckinEnabled] = useState(false);
+  const [checkinTime, setCheckinTime] = useState(new Date());
+  const [showCheckinPicker, setShowCheckinPicker] = useState(false);
+  const [checkinBusy, setCheckinBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -89,6 +103,10 @@ export default function ProfileScreen({ onClose }: Props) {
         setSavedName(n);
         setAvatarUrl(profile.avatar_url ?? null);
         setPersonalityMode(profile.personality_mode ?? "balanced");
+        setCheckinEnabled(profile.checkin_enabled ?? false);
+        const _ct = new Date();
+        _ct.setHours(profile.checkin_hour ?? 9, profile.checkin_minute ?? 0, 0, 0);
+        setCheckinTime(_ct);
         const [available, enabled] = await Promise.all([
           isBiometricAvailable(),
           isBiometricEnabled(),
@@ -131,6 +149,49 @@ export default function ProfileScreen({ onClose }: Props) {
       setPersonalityMode(prev);
       Alert.alert("Error", "Could not update the personality. Try again.");
     }
+  };
+
+  const persistCheckin = async (enabled: boolean, when: Date) => {
+    setCheckinBusy(true);
+    try {
+      if (enabled) {
+        const granted = await reqNotifPermission();
+        if (!granted) {
+          Alert.alert(
+            "Notifications are off",
+            "Turn on notifications for Saphin AI to receive daily check-ins."
+          );
+          setCheckinEnabled(false);
+          setCheckinBusy(false);
+          return;
+        }
+        await ensureAndroidChannel();
+        const token = await getExpoPushToken();
+        if (token) {
+          try {
+            await registerPushToken(token, Platform.OS);
+          } catch {
+            // best-effort
+          }
+        }
+      }
+      await updateCheckinSettings({
+        checkin_enabled: enabled,
+        checkin_hour: when.getHours(),
+        checkin_minute: when.getMinutes(),
+        checkin_tz_offset_minutes: new Date().getTimezoneOffset(),
+      });
+    } catch (e) {
+      Alert.alert("Error", "Could not save your check-in setting.");
+      setCheckinEnabled(!enabled);
+    } finally {
+      setCheckinBusy(false);
+    }
+  };
+
+  const onToggleCheckin = async (value: boolean) => {
+    setCheckinEnabled(value);
+    await persistCheckin(value, checkinTime);
   };
 
   const handleLogout = async () => {
@@ -233,7 +294,7 @@ export default function ProfileScreen({ onClose }: Props) {
       if (signInError) {
         Alert.alert(
           "Wrong current password",
-          "Your current password is incorrect. If you've forgotten it, tap “Forgot password?”."
+          "Your current password is incorrect. If you've forgotten it, tap â€œForgot password?â€."
         );
         setChangingPw(false);
         return;
@@ -365,7 +426,7 @@ export default function ProfileScreen({ onClose }: Props) {
     <View style={[styles.container, { backgroundColor: "transparent" }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onClose}>
-          <Text style={[styles.back, { color: theme.accent }]}>‹ Back</Text>
+          <Text style={[styles.back, { color: theme.accent }]}>â€¹ Back</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Profile</Text>
         <View style={{ width: 50 }} />
@@ -407,7 +468,7 @@ export default function ProfileScreen({ onClose }: Props) {
                 { backgroundColor: theme.surface, borderColor: theme.background },
               ]}
             >
-              <Text style={styles.cameraIcon}>📷</Text>
+              <Text style={styles.cameraIcon}>ðŸ“·</Text>
             </View>
           </TouchableOpacity>
           <Text style={[styles.avatarHint, { color: theme.textSecondary }]}>
@@ -517,6 +578,65 @@ export default function ProfileScreen({ onClose }: Props) {
 
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
         <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+          DAILY CHECK-IN
+        </Text>
+
+        <View
+          style={[
+            styles.bioRow,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+          ]}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.bioTitle, { color: theme.textPrimary }]}>
+              Daily check-in
+            </Text>
+            <Text style={[styles.bioSub, { color: theme.textSecondary }]}>
+              A gentle, fresh note from your companion once a day.
+            </Text>
+          </View>
+          {checkinBusy ? (
+            <ActivityIndicator color={theme.accent} />
+          ) : (
+            <Switch
+              value={checkinEnabled}
+              onValueChange={onToggleCheckin}
+              trackColor={{ false: theme.border, true: theme.accent }}
+              thumbColor="#fff"
+            />
+          )}
+        </View>
+
+        {checkinEnabled && (
+          <TouchableOpacity
+            style={[styles.secondaryBtn, { borderColor: theme.border, marginTop: 12 }]}
+            onPress={() => setShowCheckinPicker(true)}
+          >
+            <Text style={[styles.secondaryText, { color: theme.textPrimary }]}>
+              Time:{" "}
+              {checkinTime.getHours().toString().padStart(2, "0")}:
+              {checkinTime.getMinutes().toString().padStart(2, "0")}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {showCheckinPicker && (
+          <DateTimePicker
+            value={checkinTime}
+            mode="time"
+            is24Hour={false}
+            onChange={(_, d) => {
+              setShowCheckinPicker(Platform.OS === "ios");
+              if (d) {
+                setCheckinTime(d);
+                persistCheckin(checkinEnabled, d);
+              }
+            }}
+          />
+        )}
+
+        <View style={[styles.divider, { backgroundColor: theme.border }]} />
+        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
           SECURITY
         </Text>
 
@@ -605,7 +725,7 @@ export default function ProfileScreen({ onClose }: Props) {
               onPress={takePhoto}
             >
               <Text style={[styles.pickItemText, { color: theme.accentText }]}>
-                📷  Take a photo
+                ðŸ“·  Take a photo
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -613,7 +733,7 @@ export default function ProfileScreen({ onClose }: Props) {
               onPress={pickFromGallery}
             >
               <Text style={[styles.pickItemText, { color: theme.textPrimary }]}>
-                🖼  Choose from gallery
+                ðŸ–¼  Choose from gallery
               </Text>
             </TouchableOpacity>
             <TouchableOpacity

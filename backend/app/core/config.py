@@ -23,5 +23,8 @@ class Settings(BaseSettings):
     # App
     environment: str = "development"
 
+    # Phase 4: shared secret for the cron-triggered check-in endpoint
+    cron_secret: str = ""
+
 
 settings = Settings()

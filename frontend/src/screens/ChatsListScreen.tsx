@@ -27,6 +27,8 @@ type Props = {
   onOpenChat: (sessionId: string | null) => void;
   onOpenProfile: () => void;
   onOpenJournal: () => void;
+  onOpenReminders: () => void;
+  onOpenGoals: () => void;
 };
 
 function sortSessions(list: SessionSummary[]): SessionSummary[] {
@@ -40,6 +42,8 @@ export default function ChatsListScreen({
   onOpenChat,
   onOpenProfile,
   onOpenJournal,
+  onOpenReminders,
+  onOpenGoals,
 }: Props) {
   const { theme } = useTheme();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -182,6 +186,24 @@ export default function ChatsListScreen({
       >
         <Text style={[styles.journalBtnText, { color: theme.accent }]}>
           📖  Journal
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.journalBtn, { borderColor: theme.accent }]}
+        onPress={onOpenReminders}
+      >
+        <Text style={[styles.journalBtnText, { color: theme.accent }]}>
+          ⏰  Reminders
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.journalBtn, { borderColor: theme.accent }]}
+        onPress={onOpenGoals}
+      >
+        <Text style={[styles.journalBtnText, { color: theme.accent }]}>
+          🎯  Goals
         </Text>
       </TouchableOpacity>
 

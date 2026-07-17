@@ -1,22 +1,27 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   AppState,
   AppStateStatus,
   BackHandler,
+  Platform,
   StatusBar,
   View,
 } from "react-native";
 import { Session } from "@supabase/supabase-js";
+import * as Notifications from "expo-notifications";
 import { supabase } from "./src/services/supabase";
-import { getProfile, updateProfile } from "./src/services/api";
+import { getProfile, updateProfile, registerPushToken } from "./src/services/api";
+import {
+  ensureAndroidChannel,
+  requestPermission,
+  getExpoPushToken,
+} from "./src/services/notifications";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
 import {
   isBiometricAvailable,
   isBiometricEnabled,
-  getBiometricSetting,
-  setBiometricEnabled,
 } from "./src/services/biometrics";
 import AuthScreen from "./src/screens/AuthScreen";
 import LockScreen from "./src/screens/LockScreen";
@@ -24,12 +29,16 @@ import ChatsListScreen from "./src/screens/ChatsListScreen";
 import ChatScreen from "./src/screens/ChatScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
 import JournalScreen from "./src/screens/JournalScreen";
+import RemindersScreen from "./src/screens/RemindersScreen";
+import GoalsScreen from "./src/screens/GoalsScreen";
 
 type View3 =
   | { name: "list" }
   | { name: "chat"; sessionId: string | null }
   | { name: "profile" }
-  | { name: "journal" };
+  | { name: "journal" }
+  | { name: "reminders" }
+  | { name: "goals" };
 
 // On login: adopt the server's theme (if this device has none saved), and
 // copy the signup name into the profile if it's still missing.
@@ -51,21 +60,32 @@ async function syncProfile(
   }
 }
 
+// Best-effort: make sure this device is registered to receive push check-ins.
+// Never blocks or breaks login if permission is denied or offline.
+async function syncPushToken() {
+  try {
+    await ensureAndroidChannel();
+    const granted = await requestPermission();
+    if (!granted) return;
+    const token = await getExpoPushToken();
+    if (token) await registerPushToken(token, Platform.OS);
+  } catch {
+    // ignore
+  }
+}
+
 // After a fresh password login, offer to turn on biometric quick-unlock —
 // but only once (never asked before) and only on capable devices.
 async function maybeOfferBiometric() {
   try {
     const available = await isBiometricAvailable();
     if (!available) return;
-    const setting = await getBiometricSetting();
-    if (setting !== null) return; // already decided
+    const enabled = await isBiometricEnabled();
+    if (enabled) return; // already on — nothing to offer
     Alert.alert(
       "Enable quick unlock?",
-      "Use your fingerprint or face to unlock Saphin AI next time, instead of typing your password.",
-      [
-        { text: "Not now", style: "cancel", onPress: () => setBiometricEnabled(false) },
-        { text: "Enable", onPress: () => setBiometricEnabled(true) },
-      ]
+      "You can turn on fingerprint or face unlock anytime in Profile, under Security.",
+      [{ text: "OK" }]
     );
   } catch {
     // ignore
@@ -86,6 +106,7 @@ function Root() {
       setSession(data.session);
       if (data.session) {
         syncProfile(data.session, hydrateFromServer);
+        syncPushToken();
         try {
           const [enabled, available] = await Promise.all([
             isBiometricEnabled(),
@@ -105,10 +126,22 @@ function Root() {
       if (s && event === "SIGNED_IN") {
         setLocked(false); // just logged in with password — already authenticated
         syncProfile(s, hydrateFromServer);
+        syncPushToken();
         maybeOfferBiometric();
       }
     });
     return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // When a daily check-in notification is tapped, open a fresh chat.
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
+      const type = resp.notification.request.content.data?.type;
+      if (type === "checkin") {
+        setView({ name: "chat", sessionId: null });
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   // Re-lock when the app returns from a true background (not the brief flicker
@@ -141,7 +174,9 @@ function Root() {
       if (
         view.name === "chat" ||
         view.name === "profile" ||
-        view.name === "journal"
+        view.name === "journal" ||
+        view.name === "reminders" ||
+        view.name === "goals"
       ) {
         setView({ name: "list" });
         return true;
@@ -201,6 +236,10 @@ function Root() {
     content = <ProfileScreen onClose={() => setView({ name: "list" })} />;
   } else if (view.name === "journal") {
     content = <JournalScreen onBack={() => setView({ name: "list" })} />;
+  } else if (view.name === "reminders") {
+    content = <RemindersScreen onBack={() => setView({ name: "list" })} />;
+  } else if (view.name === "goals") {
+    content = <GoalsScreen onBack={() => setView({ name: "list" })} />;
   } else if (view.name === "chat") {
     content = (
       <ChatScreen
@@ -214,6 +253,8 @@ function Root() {
         onOpenChat={(sessionId) => setView({ name: "chat", sessionId })}
         onOpenProfile={() => setView({ name: "profile" })}
         onOpenJournal={() => setView({ name: "journal" })}
+        onOpenReminders={() => setView({ name: "reminders" })}
+        onOpenGoals={() => setView({ name: "goals" })}
       />
     );
   }
@@ -233,3 +274,4 @@ export default function App() {
     </ThemeProvider>
   );
 }
+

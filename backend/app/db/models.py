@@ -1,7 +1,7 @@
-"""ORM models: chat sessions, chat messages, profiles, memories, mood logs, journal."""
+﻿"""ORM models: chat sessions, chat messages, profiles, memories, mood logs, journal, phase4."""
 import uuid
-from datetime import datetime
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from datetime import date, datetime
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
@@ -69,6 +69,20 @@ class Profile(Base):
         Text, nullable=False, server_default="balanced"
     )
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Phase 4B: daily AI check-in settings
+    checkin_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    checkin_hour: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="9"
+    )
+    checkin_minute: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
+    checkin_tz_offset_minutes: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
+    last_checkin_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -136,4 +150,61 @@ class JournalEntry(Base):
     reflection: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class PushToken(Base):
+    """Phase 4B: an Expo push token so we can send remote notifications."""
+    __tablename__ = "push_tokens"
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    user_id: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    token: Mapped[str] = mapped_column(Text, nullable=False)
+    platform: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Reminder(Base):
+    """Phase 4C: a user-created reminder (fires locally on device; mirrored here)."""
+    __tablename__ = "reminders"
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    user_id: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    remind_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    repeats_daily: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    local_notif_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Goal(Base):
+    """Phase 4D: a personal goal the companion helps encourage."""
+    __tablename__ = "goals"
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    user_id: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="active"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
