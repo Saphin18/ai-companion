@@ -24,3 +24,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Firebase FCM service account (SECRET)
+frontend/fcm-service-account.json
+
