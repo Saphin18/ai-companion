@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -10,10 +10,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as Speech from "expo-speech";
 import ChatBubble from "../components/ChatBubble";
 import ChatInput from "../components/ChatInput";
-import { sendChatMessage, loadSessionMessages } from "../services/api";
-import { ChatMessage } from "../types/chat";
+import { loadSessionMessages } from "../services/api";
+import { sendChatWithAttachments } from "../services/attachments";
+import { Attachment, ChatMessage } from "../types/chat";
 import { useTheme } from "../context/ThemeContext";
 
 type Props = {
@@ -36,6 +38,13 @@ export default function ChatScreen({ sessionId, onBack, initialMessage }: Props)
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(sessionId !== null);
 
+  // Phase 6: hands-free turn mode. When on, the companion reads its reply
+  // aloud and then reopens the mic, so a whole conversation needs no taps.
+  const [handsFree, setHandsFree] = useState(false);
+  const [autoRecordSignal, setAutoRecordSignal] = useState(0);
+  const handsFreeRef = useRef(false);
+  handsFreeRef.current = handsFree;
+
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   const scrollToEnd = () => {
@@ -49,6 +58,13 @@ export default function ChatScreen({ sessionId, onBack, initialMessage }: Props)
     return () => showSub.remove();
   }, []);
 
+  // Never leave the phone talking after the user walks away from this screen.
+  useEffect(() => {
+    return () => {
+      Speech.stop();
+    };
+  }, []);
+
   useEffect(() => {
     if (sessionId === null) {
       setMessages([WELCOME]);
@@ -58,11 +74,12 @@ export default function ChatScreen({ sessionId, onBack, initialMessage }: Props)
     (async () => {
       try {
         const history = await loadSessionMessages(sessionId);
-        const mapped: ChatMessage[] = history.map((m) => ({
+        const mapped: ChatMessage[] = history.map((m: any) => ({
           id: m.id,
           role: m.role === "assistant" ? "companion" : "user",
           text: m.content,
           createdAt: new Date(m.created_at).getTime(),
+          attachments: m.attachments ?? [],
         }));
         setMessages(mapped.length > 0 ? mapped : [WELCOME]);
       } catch (e) {
@@ -83,22 +100,38 @@ export default function ChatScreen({ sessionId, onBack, initialMessage }: Props)
       sessionId === null
     ) {
       sentInitial.current = true;
-      handleSend(initialMessage.trim());
+      handleSend(initialMessage.trim(), []);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialMessage]);
 
-  const handleSend = async (text: string) => {
+  const handleSend = async (text: string, attachments: Attachment[] = []) => {
+    if (!text.trim() && attachments.length === 0) return;
+
+    // A voice note with no transcript still deserves a bubble.
+    const shown =
+      text.trim() ||
+      (attachments.some((a) => a.kind === "voice")
+        ? "(voice message)"
+        : "(attachment)");
+
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}`,
       role: "user",
-      text,
+      text: shown,
       createdAt: Date.now(),
+      attachments,
     };
     setMessages((prev) => [...prev, userMsg]);
     setSending(true);
+    Speech.stop();
+
     try {
-      const { reply, session_id } = await sendChatMessage(text, currentSession);
+      const { reply, session_id } = await sendChatWithAttachments(
+        text,
+        currentSession,
+        attachments.map((a) => a.id)
+      );
       setCurrentSession(session_id);
       setMessages((prev) => [
         ...prev,
@@ -109,6 +142,16 @@ export default function ChatScreen({ sessionId, onBack, initialMessage }: Props)
           createdAt: Date.now(),
         },
       ]);
+
+      if (handsFreeRef.current) {
+        Speech.speak(reply, {
+          onDone: () => {
+            // Only reopen the mic if hands-free is still on.
+            if (handsFreeRef.current) setAutoRecordSignal((n) => n + 1);
+          },
+          onStopped: () => {},
+        });
+      }
     } catch (e) {
       setMessages((prev) => [
         ...prev,
@@ -122,6 +165,13 @@ export default function ChatScreen({ sessionId, onBack, initialMessage }: Props)
     } finally {
       setSending(false);
     }
+  };
+
+  const toggleHandsFree = () => {
+    setHandsFree((on) => {
+      if (on) Speech.stop();
+      return !on;
+    });
   };
 
   if (loading) {
@@ -161,7 +211,13 @@ export default function ChatScreen({ sessionId, onBack, initialMessage }: Props)
         </Text>
       )}
 
-      <ChatInput onSend={handleSend} disabled={sending} />
+      <ChatInput
+        onSend={handleSend}
+        disabled={sending}
+        handsFree={handsFree}
+        onToggleHandsFree={toggleHandsFree}
+        autoRecordSignal={autoRecordSignal}
+      />
     </>
   );
 

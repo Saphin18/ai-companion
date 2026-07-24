@@ -14,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.saphin.ai"
+      "bundleIdentifier": "com.saphin.ai",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Saphin AI uses your microphone so you can send voice messages to your companion."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +27,8 @@
       "edgeToEdgeEnabled": false,
       "softwareKeyboardLayoutMode": "resize",
       "package": "com.saphin.ai",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "permissions": ["RECORD_AUDIO"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -37,8 +41,14 @@
     "plugins": [
       "expo-secure-store",
       "@react-native-community/datetimepicker",
-      "expo-font"
+      "expo-font",
+      "expo-asset",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Saphin AI uses your microphone so you can send voice messages to your companion."
+        }
+      ]
     ]
   }
 }
-
