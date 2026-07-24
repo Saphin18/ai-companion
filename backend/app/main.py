@@ -2,6 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import (
+    attachments,
     chat,
     confirmed,
     goals,
@@ -31,4 +32,5 @@ app.include_router(reset_password.router)
 app.include_router(reminders.router)
 app.include_router(goals.router)
 app.include_router(push.router)
+app.include_router(attachments.router)
 app.include_router(internal.router)

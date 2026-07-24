@@ -2,11 +2,14 @@
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict
+from app.models.attachment import AttachmentOut
 
 
 class ChatRequest(BaseModel):
     message: str
     session_id: UUID | None = None
+    # Phase 6: ids returned by POST /attachments, sent with this message.
+    attachment_ids: list[UUID] = []
 
 
 class ChatResponse(BaseModel):
@@ -20,6 +23,8 @@ class MessageOut(BaseModel):
     role: str
     content: str
     created_at: datetime
+    # Phase 6: voice notes / images / documents attached to this message.
+    attachments: list[AttachmentOut] = []
 
 
 class SessionOut(BaseModel):
