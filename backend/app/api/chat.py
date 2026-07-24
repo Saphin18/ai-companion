@@ -78,7 +78,9 @@ async def chat(
             attachments = await attach_repo.get_attachments(
                 db, str(user_id), payload.attachment_ids
             )
-        except Exception:
+        except Exception as e:
+            import traceback; traceback.print_exc()
+            print(f"ATTACHMENT FETCH FAILED: {e}")
             attachments = []
 
     message_text = (payload.message or "").strip()
@@ -312,3 +314,4 @@ async def remove_session(
             status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
         )
     await db.commit()
+

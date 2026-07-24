@@ -96,6 +96,7 @@ function Root() {
   const [view, setView] = useState<View3>({ name: "list" });
 
   const appState = useRef<AppStateStatus>(AppState.currentState);
+  const backgroundedAt = useRef<number>(0);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -143,7 +144,14 @@ function Root() {
     const sub = AppState.addEventListener("change", async (next) => {
       const prev = appState.current;
       appState.current = next;
-      if (prev === "background" && next === "active") {
+      if (next.match(/inactive|background/)) {
+        backgroundedAt.current = Date.now();
+      }
+      if (prev.match(/inactive|background/) && next === "active") {
+        // Ignore brief trips: image/document pickers and the mic permission
+        // dialog momentarily background the app. A real app-switch is longer.
+        const awayMs = Date.now() - backgroundedAt.current;
+        if (awayMs < 4000) return;
         if (session) {
           try {
             const [enabled, available] = await Promise.all([
@@ -273,3 +281,5 @@ export default function App() {
     </ThemeProvider>
   );
 }
+
+
