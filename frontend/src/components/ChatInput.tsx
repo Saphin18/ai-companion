@@ -138,6 +138,21 @@ export default function ChatInput({
     }
   };
 
+  const cancelRecording = async () => {
+    if (autoStop.current) {
+      clearTimeout(autoStop.current);
+      autoStop.current = null;
+    }
+    try {
+      await recorder.stop();
+    } catch {
+      // ignore - we are throwing the audio away anyway
+    } finally {
+      startedAt.current = 0;
+      await setAudioModeAsync({ allowsRecording: false });
+    }
+  };
+
   // Hands-free: parent bumps this number when it's the user's turn again.
   useEffect(() => {
     if (autoRecordSignal && handsFree && !recording && !disabled && !busy) {
@@ -276,12 +291,23 @@ export default function ChatInput({
 
       {recording ? (
         <View style={styles.container}>
-          <View style={[styles.recording, { backgroundColor: theme.surfaceAlt }]}>
+          <TouchableOpacity
+            style={[styles.iconBtn, { backgroundColor: theme.surfaceAlt }]}
+            onPress={cancelRecording}
+            accessibilityLabel="Cancel voice message"
+          >
+            <Ionicons name="trash-outline" size={20} color={theme.danger} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.recording, { backgroundColor: theme.surfaceAlt }]}
+            onPress={stopRecording}
+            activeOpacity={0.8}
+          >
             <View style={[styles.recDot, { backgroundColor: theme.danger }]} />
             <Text style={[styles.recText, { color: theme.textPrimary }]}>
               Recording... tap to send
             </Text>
-          </View>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.iconBtn, { backgroundColor: theme.accent }]}
             onPress={stopRecording}
@@ -390,7 +416,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingHorizontal: 18,
     minHeight: 48,
-    marginRight: 8,
+    marginHorizontal: 8,
   },
   recDot: {
     width: 9,
@@ -439,6 +465,9 @@ const styles = StyleSheet.create({
     paddingTop: 6,
   },
 });
+
+
+
 
 
 
