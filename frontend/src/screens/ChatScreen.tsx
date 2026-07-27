@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -186,7 +186,7 @@ export default function ChatScreen({ sessionId, onBack, initialMessage }: Props)
     <>
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Text style={[styles.backText, { color: theme.accent }]}>‹ Chats</Text>
+          <Text style={[styles.backText, { color: theme.accent }]}>â€¹ Chats</Text>
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
           Companion
@@ -207,7 +207,7 @@ export default function ChatScreen({ sessionId, onBack, initialMessage }: Props)
 
       {sending && (
         <Text style={[styles.thinking, { color: theme.textSecondary }]}>
-          Thinking…
+          Thinkingâ€¦
         </Text>
       )}
 
@@ -217,11 +217,12 @@ export default function ChatScreen({ sessionId, onBack, initialMessage }: Props)
         handsFree={handsFree}
         onToggleHandsFree={toggleHandsFree}
         autoRecordSignal={autoRecordSignal}
+        draftKey={currentSession ?? 'new'}
       />
     </>
   );
 
-  // iOS: lift with padding. Android: no wrapper — the OS `resize` mode moves the
+  // iOS: lift with padding. Android: no wrapper â€” the OS `resize` mode moves the
   // input above the keyboard by itself (a second lifter here would double it up).
   if (Platform.OS === "ios") {
     return (
@@ -262,3 +263,4 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
 });
+

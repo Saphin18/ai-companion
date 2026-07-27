@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
 import {
   AudioModule,
   RecordingPresets,
@@ -31,6 +32,8 @@ interface Props {
   onToggleHandsFree?: () => void;
   /** Set from the parent to auto-open the mic after the companion speaks. */
   autoRecordSignal?: number;
+  /** Unique key so each chat keeps its own unsent draft text. */
+  draftKey?: string;
 }
 
 const MAX_RECORD_MS = 120000; // 2 minutes is plenty for a voice note
@@ -41,9 +44,40 @@ export default function ChatInput({
   handsFree,
   onToggleHandsFree,
   autoRecordSignal,
+  draftKey = 'draft:new',
 }: Props) {
   const { theme } = useTheme();
   const [text, setText] = useState('');
+
+  // --- draft persistence ---------------------------------------------------
+  // Unsent text survives leaving the app (biometric lock, memory kill, calls).
+  // Stored in secure storage, keyed per chat so drafts never cross over.
+  const storeKey = `saphin.draft.${draftKey}`;
+
+  // Restore whatever was left unsent when this input mounts.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const saved = await SecureStore.getItemAsync(storeKey);
+        if (alive && saved) setText(saved);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeKey]);
+
+  // Save the draft as it changes, debounced so we are not hammering storage.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      SecureStore.setItemAsync(storeKey, text).catch(() => {});
+    }, 300);
+    return () => clearTimeout(t);
+  }, [text, storeKey]);
   const [pending, setPending] = useState<Attachment[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -190,6 +224,7 @@ export default function ChatInput({
     onSend(trimmed, pending);
     setText('');
     setPending([]);
+    SecureStore.deleteItemAsync(storeKey).catch(() => {});
   };
 
   const canSend = !disabled && !busy && (!!text.trim() || pending.length > 0);
@@ -404,3 +439,8 @@ const styles = StyleSheet.create({
     paddingTop: 6,
   },
 });
+
+
+
+
+
