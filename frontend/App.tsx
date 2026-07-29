@@ -19,6 +19,7 @@ import {
   getExpoPushToken,
 } from "./src/services/notifications";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
+import { pickerLock } from "./src/services/pickerLock";
 import {
   isBiometricAvailable,
   isBiometricEnabled,
@@ -152,6 +153,8 @@ function Root() {
         // dialog momentarily background the app. A real app-switch is longer.
         const awayMs = Date.now() - backgroundedAt.current;
         if (awayMs < 4000) return;
+        // A picker or crop screen is still open — don't interrupt it.
+        if (pickerLock.active) return;
         if (session) {
           try {
             const [enabled, available] = await Promise.all([

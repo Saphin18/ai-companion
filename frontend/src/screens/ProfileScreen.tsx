@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -34,6 +34,7 @@ import {
 import { registerPushToken } from "../services/api";
 import { useTheme, ThemeMode } from "../context/ThemeContext";
 import { ThemePicker } from "../theme/components";
+import { pickerLock } from "../services/pickerLock";
 import {
   isBiometricAvailable,
   isBiometricEnabled,
@@ -47,10 +48,10 @@ const RESET_REDIRECT_URL =
   "https://saphin-ai-backend.onrender.com/reset-password";
 
 const PERSONALITY_OPTIONS: { key: string; label: string; emoji: string }[] = [
-  { key: "balanced", label: "Balanced", emoji: "🙂" },
-  { key: "motivator", label: "Motivator", emoji: "💪" },
-  { key: "humor", label: "Humor", emoji: "😄" },
-  { key: "calm", label: "Calm", emoji: "🌿" },
+  { key: "balanced", label: "Balanced", emoji: "\uD83D\uDE42" },
+  { key: "motivator", label: "Motivator", emoji: "\uD83D\uDCAA" },
+  { key: "humor", label: "Humor", emoji: "\uD83D\uDE04" },
+  { key: "calm", label: "Calm", emoji: "\uD83C\uDF3F" },
 ];
 
 type Props = {
@@ -386,12 +387,17 @@ export default function ProfileScreen({ onClose }: Props) {
       Alert.alert("Camera permission needed", "Enable camera access to take a photo.");
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.6,
-    });
-    await processResult(result);
+    pickerLock.active = true;
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.6,
+      });
+      await processResult(result);
+    } finally {
+      pickerLock.active = false;
+    }
   };
 
   const pickFromGallery = async () => {
@@ -401,13 +407,18 @@ export default function ProfileScreen({ onClose }: Props) {
       Alert.alert("Gallery permission needed", "Enable photo access to choose an image.");
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.6,
-    });
-    await processResult(result);
+    pickerLock.active = true;
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.6,
+      });
+      await processResult(result);
+    } finally {
+      pickerLock.active = false;
+    }
   };
 
   const THEME_OPTIONS: { key: ThemeMode; label: string }[] = [
@@ -428,7 +439,7 @@ export default function ProfileScreen({ onClose }: Props) {
     <View style={[styles.container, { backgroundColor: "transparent" }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onClose}>
-          <Text style={[styles.back, { color: theme.accent }]}>‹ Back</Text>
+          <Text style={[styles.back, { color: theme.accent }]}>{"\u2039"} Back</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Profile</Text>
         <View style={{ width: 50 }} />
@@ -470,7 +481,7 @@ export default function ProfileScreen({ onClose }: Props) {
                 { backgroundColor: theme.surface, borderColor: theme.background },
               ]}
             >
-              <Text style={styles.cameraIcon}>📷</Text>
+              <Text style={styles.cameraIcon}>{"\uD83D\uDCF7"}</Text>
             </View>
           </TouchableOpacity>
           <Text style={[styles.avatarHint, { color: theme.textSecondary }]}>
@@ -727,7 +738,7 @@ export default function ProfileScreen({ onClose }: Props) {
               onPress={takePhoto}
             >
               <Text style={[styles.pickItemText, { color: theme.accentText }]}>
-                📷  Take a photo
+                {"\uD83D\uDCF7"}  Take a photo
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -735,7 +746,7 @@ export default function ProfileScreen({ onClose }: Props) {
               onPress={pickFromGallery}
             >
               <Text style={[styles.pickItemText, { color: theme.textPrimary }]}>
-                🖼  Choose from gallery
+                {"\uD83D\uDDBC"}  Choose from gallery
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -1113,9 +1124,3 @@ const styles = StyleSheet.create({
   pickCancel: { paddingVertical: 12, alignItems: "center", marginTop: 2 },
   pickCancelText: { fontSize: 15, fontWeight: "600" },
 });
-
-
-
-
-
-

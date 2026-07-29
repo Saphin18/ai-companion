@@ -21,6 +21,7 @@ import {
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../context/ThemeContext';
+import { pickerLock } from '../services/pickerLock';
 import { uploadAttachment } from '../services/attachments';
 import type { Attachment } from '../types/chat';
 
@@ -194,10 +195,12 @@ export default function ChatInput({
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) return;
+      pickerLock.active = true;
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         quality: 0.7,
       });
+      pickerLock.active = false;
       if (result.canceled || !result.assets?.length) return;
       const asset = result.assets[0];
       setBusy('Reading image...');
@@ -209,6 +212,7 @@ export default function ChatInput({
       );
       setPending((p) => [...p, att]);
     } catch (e: any) {
+      pickerLock.active = false;
       Alert.alert('Could not add image', e?.message ?? 'Please try again.');
     } finally {
       setBusy(null);
@@ -217,10 +221,12 @@ export default function ChatInput({
 
   const pickDocument = async () => {
     try {
+      pickerLock.active = true;
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'text/*', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
         copyToCacheDirectory: true,
       });
+      pickerLock.active = false;
       if (result.canceled || !result.assets?.length) return;
       const asset = result.assets[0];
       setBusy('Reading document...');
@@ -238,6 +244,7 @@ export default function ChatInput({
       }
       setPending((p) => [...p, att]);
     } catch (e: any) {
+      pickerLock.active = false;
       Alert.alert('Could not add document', e?.message ?? 'Please try again.');
     } finally {
       setBusy(null);
