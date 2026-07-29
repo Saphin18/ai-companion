@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -22,6 +22,7 @@ type Props = {
   sessionId: string | null;
   onBack: () => void;
   initialMessage?: string | null;
+  initialAction?: "record" | "photo" | "document" | null;
 };
 
 const WELCOME: ChatMessage = {
@@ -31,7 +32,7 @@ const WELCOME: ChatMessage = {
   createdAt: Date.now(),
 };
 
-export default function ChatScreen({ sessionId, onBack, initialMessage }: Props) {
+export default function ChatScreen({ sessionId, onBack, initialMessage, initialAction }: Props) {
   const { theme } = useTheme();
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
   const [currentSession, setCurrentSession] = useState<string | null>(sessionId);
@@ -44,6 +45,10 @@ export default function ChatScreen({ sessionId, onBack, initialMessage }: Props)
   const [autoRecordSignal, setAutoRecordSignal] = useState(0);
   const handsFreeRef = useRef(false);
   handsFreeRef.current = handsFree;
+
+  // Home-screen attachment shortcuts: signal ChatInput to open a picker on mount.
+  const [triggerPhotoSignal, setTriggerPhotoSignal] = useState(0);
+  const [triggerDocSignal, setTriggerDocSignal] = useState(0);
 
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
@@ -104,6 +109,18 @@ export default function ChatScreen({ sessionId, onBack, initialMessage }: Props)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialMessage]);
+
+  // Home-screen shortcut: fire the matching picker/recorder once on first mount.
+  const firedAction = useRef(false);
+  useEffect(() => {
+    if (!firedAction.current && initialAction && !loading && !sending) {
+      firedAction.current = true;
+      if (initialAction === "record") setAutoRecordSignal((n) => n + 1);
+      else if (initialAction === "photo") setTriggerPhotoSignal((n) => n + 1);
+      else if (initialAction === "document") setTriggerDocSignal((n) => n + 1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAction, loading]);
 
   const handleSend = async (text: string, attachments: Attachment[] = []) => {
     if (!text.trim() && attachments.length === 0) return;
@@ -186,7 +203,7 @@ export default function ChatScreen({ sessionId, onBack, initialMessage }: Props)
     <>
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Text style={[styles.backText, { color: theme.accent }]}>â€¹ Chats</Text>
+          <Text style={[styles.backText, { color: theme.accent }]}>{"\u2039"} Chats</Text>
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
           Companion
@@ -207,7 +224,7 @@ export default function ChatScreen({ sessionId, onBack, initialMessage }: Props)
 
       {sending && (
         <Text style={[styles.thinking, { color: theme.textSecondary }]}>
-          Thinkingâ€¦
+          Thinking{"\u2026"}
         </Text>
       )}
 
@@ -218,11 +235,13 @@ export default function ChatScreen({ sessionId, onBack, initialMessage }: Props)
         onToggleHandsFree={toggleHandsFree}
         autoRecordSignal={autoRecordSignal}
         draftKey={currentSession ?? 'new'}
+        triggerPhotoSignal={triggerPhotoSignal}
+        triggerDocSignal={triggerDocSignal}
       />
     </>
   );
 
-  // iOS: lift with padding. Android: no wrapper â€” the OS `resize` mode moves the
+  // iOS: lift with padding. Android: no wrapper {"\u2014"} the OS `resize` mode moves the
   // input above the keyboard by itself (a second lifter here would double it up).
   if (Platform.OS === "ios") {
     return (
@@ -263,4 +282,3 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
 });
-

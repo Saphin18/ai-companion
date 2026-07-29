@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -34,6 +34,10 @@ interface Props {
   autoRecordSignal?: number;
   /** Unique key so each chat keeps its own unsent draft text. */
   draftKey?: string;
+  /** Signal to trigger photo picker from parent (home-screen shortcut). */
+  triggerPhotoSignal?: number;
+  /** Signal to trigger document picker from parent (home-screen shortcut). */
+  triggerDocSignal?: number;
 }
 
 const MAX_RECORD_MS = 120000; // 2 minutes is plenty for a voice note
@@ -45,6 +49,8 @@ export default function ChatInput({
   onToggleHandsFree,
   autoRecordSignal,
   draftKey = 'draft:new',
+  triggerPhotoSignal,
+  triggerDocSignal,
 }: Props) {
   const { theme } = useTheme();
   const [text, setText] = useState('');
@@ -160,6 +166,21 @@ export default function ChatInput({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRecordSignal]);
+
+  // Parent can trigger photo/document picker (home-screen shortcuts).
+  useEffect(() => {
+    if (triggerPhotoSignal && !recording && !disabled && !busy) {
+      pickImage();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triggerPhotoSignal]);
+
+  useEffect(() => {
+    if (triggerDocSignal && !recording && !disabled && !busy) {
+      pickDocument();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triggerDocSignal]);
 
   useEffect(() => {
     return () => {
@@ -465,11 +486,3 @@ const styles = StyleSheet.create({
     paddingTop: 6,
   },
 });
-
-
-
-
-
-
-
-

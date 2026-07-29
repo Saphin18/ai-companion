@@ -1,5 +1,10 @@
 # Saphin AI — MASTER HANDOVER (the ONE file)
 
+> ⚠️ **ALWAYS SCROLL TO THE LAST SECTION FIRST.** New work is ADDED to the bottom of this file,
+> never merged into the middle. The newest section at the very end is the CURRENT status and
+> OVERRIDES everything above it wherever they conflict. Read the last section first, then come
+> back up here for the stable reference material (architecture, contracts, secrets, bugs).
+
 > **This single file replaces every previous handover file and every kickoff file.**
 > Paste ONLY this into a new chat. It contains the whole project from day one to now:
 > what we're building, every architecture decision, every file and its exact path, every
@@ -14,6 +19,20 @@
 
 ## 0.1 Where we are RIGHT NOW
 
+**The app is built through Phase 6. Phases 1-5 are shipped and verified on the real APK.
+Phase 6 (attachments) BACKEND is COMPLETE, tested, and committed. The Phase 6 FRONTEND is
+written and an APK build was started, but is NOT YET TESTED ON A DEVICE.**
+
+> Phase 6 = voice messages (record → auto-transcribed), image reading, document (PDF/DOCX)
+> reading, and the companion speaking replies aloud (hands-free turn mode). Everything runs on
+> the existing Groq key — no new provider, no billing.
+>
+> **Full Phase 6 detail is in SECTION 16 at the very bottom.** SECTION 16 is the NEWEST section
+> and WINS over anything above it where they conflict. Read it for the current state and the
+> immediate next step (install and test the APK).
+
+---
+
 **The app is fully built through Phase 5 and shipped as a working APK.**
 
 Latest session (Phase 4 + Phase 5) — everything below is DONE, TESTED, COMMITTED, PUSHED,
@@ -25,11 +44,11 @@ and BUILT into an APK that finished successfully on EAS:
 - **Phase 5 — Navigation redesign: COMPLETE.** Claude/ChatGPT-style home (hamburger menu +
   greeting + real chat input bar), left slide-in drawer holding all navigation + chat history,
   and a new About screen.
-- **APK build:** finished successfully (`Phase 5: drawer navigation, home redesign, home input,
-  About screen`, commit `8c84ffc`, build 41m 20s, all steps green including `expo doctor`).
+- **APK build:** finished successfully (`Phase 5: drawer navigation, home redesign, home input, About screen`, commit `8c84ffc`, build 41m 20s, all steps green including `expo doctor`).
 
 **IMMEDIATE NEXT STEP:** install the APK on the phone and smoke-test the things that
 **only work in a real build** (they cannot be tested in Expo Go):
+
 1. No more red `expo-notifications` error on launch.
 2. Daily check-in toggle **stays ON** after leaving and returning to Profile.
 3. Permission prompt appears -> Allow -> a real AI-written check-in push arrives.
@@ -95,21 +114,19 @@ I'm a beginner on **Windows**, working in **PowerShell**. On EVERY answer:
 These are explicit owner decisions. Do not "improve" them.
 
 1. **CHAT DATA IS NEVER DELETED FROM THE DATABASE BY THE USER.**
+
    - "Remove from list" = **soft delete** via a `hidden_at` timestamp. The row and its
      messages STAY in Postgres, just hidden from the list.
    - There is **NO hard-delete of chat rows** anywhere. Do not add one.
    - **Labeling rule:** never label a chat action "Delete my data" or imply permanent
      erasure. Use honest labels like "Remove from list".
-
 2. **Log out means log out.** It only ends the session. It deletes nothing.
-
 3. **Full name is collected AT SIGN UP** (and editable later in Profile). Because email
    confirmation is ON, the name is stored in auth metadata at signup and written to the
    profile on first login (see SECTION 11 #22).
-
 4. **Always tell me FRONTEND or BACKEND** for every terminal command.
-
 5. **ACCOUNT DELETION — the ONE permanent delete.**
+
    - "Delete my account" in Profile permanently deletes the **Supabase auth user** (login)
      via a backend admin call.
    - It does **NOT** delete chat data. `chat_sessions` / `chat_messages` use a plain
@@ -117,33 +134,29 @@ These are explicit owner decisions. Do not "improve" them.
    - Effect: the email becomes reusable; re-signup = brand-new account with an empty chat
      list. Old chats stay in the DB, orphaned. Intentional.
    - UI requires **double confirmation** (custom dark two-step dialog, red confirm).
-
 6. **PASSWORD RESET & CHANGE PASSWORD = backend-hosted HTML pages**, not app deep links
    (`/reset-password`, `/confirmed` served by FastAPI). Works from any browser. Do not
    "improve" into an in-app deep link without asking.
+
    - Change password **requires the current password** (verified via `signInWithPassword`),
      with a "Forgot password?" link bottom-right as an escape hatch. Keep this layout.
-
 7. **BIOMETRIC LOGIN LIVES IN TWO PLACES.** Profile has the enable/disable toggle
    ("Fingerprint login"); the **login screen** has the fingerprint button beside "Log in"
    (only when enabled). This mirrors the owner's bank app. Do NOT move it to an
    auto-lock-on-open model.
-
 8. **BIOMETRIC STORAGE = OPTION B (store password).** On enable, the app stores
    **email + password** in `expo-secure-store` (encrypted keystore) and logs in fresh each
    time via `signInWithPassword`. The owner was told the tradeoff and chose this "always works
    like a banking app" option over storing the session token. Do not silently switch.
+
    - Must stay: changing the password refreshes the stored password; deleting the account
      wipes stored creds; a stale password falls back to the password screen.
-
 9. **PROACTIVITY MUST BE NON-MANIPULATIVE (Phase 4).** The daily check-in is **OFF by
    default**, the user picks the time, and there are **no streaks, no guilt, no "you haven't
    talked in X days" pressure**. One tap to turn off. Never add engagement-bait mechanics.
-
 10. **`newArchEnabled` MUST stay `false`** in `app.json`. New Arch breaks the Android keyboard
     layout (SECTION 11 #26). Expo Go will WARN that it's disabled — **ignore that warning**,
     it only applies to Expo Go, not the real build.
-
 11. **Log out and Delete account live in Profile ONLY** — not in the navigation drawer
     (owner's explicit Phase 5 decision).
 
@@ -356,19 +369,20 @@ the real names in the real files. Do not assume; use these.
 
 ## 3.1 ORM models — `backend/app/db/models.py`
 
-| Model | Table | user id column | Notes |
-|---|---|---|---|
-| `ChatSession` | `chat_sessions` | `user_id` **UUID** | + `title`, `pinned`, `hidden_at` |
-| `ChatMessage` | `chat_messages` | `user_id` **UUID** | FK `session_id` -> chat_sessions |
-| `Profile` | `profiles` | **`id`** IS the user id | **There is NO `user_id` column on Profile** |
-| `UserMemory` | `user_memories` | `user_id` **text** | |
-| `MoodLog` | `mood_logs` | `user_id` **text** | |
-| `JournalEntry` | `journal_entries` | `user_id` **text** | |
-| `PushToken` | `push_tokens` | `user_id` **text** | unique (user_id, token) |
-| `Reminder` | `reminders` | `user_id` **text** | |
-| `Goal` | `goals` | `user_id` **text** | |
+| Model            | Table               | user id column                  | Notes                                               |
+| ---------------- | ------------------- | ------------------------------- | --------------------------------------------------- |
+| `ChatSession`  | `chat_sessions`   | `user_id` **UUID**      | +`title`, `pinned`, `hidden_at`               |
+| `ChatMessage`  | `chat_messages`   | `user_id` **UUID**      | FK`session_id` -> chat_sessions                   |
+| `Profile`      | `profiles`        | **`id`** IS the user id | **There is NO `user_id` column on Profile** |
+| `UserMemory`   | `user_memories`   | `user_id` **text**      |                                                     |
+| `MoodLog`      | `mood_logs`       | `user_id` **text**      |                                                     |
+| `JournalEntry` | `journal_entries` | `user_id` **text**      |                                                     |
+| `PushToken`    | `push_tokens`     | `user_id` **text**      | unique (user_id, token)                             |
+| `Reminder`     | `reminders`       | `user_id` **text**      |                                                     |
+| `Goal`         | `goals`           | `user_id` **text**      |                                                     |
 
 **The two biggest traps:**
+
 - `Profile.id` is the user id. Writing `Profile.user_id` = crash. (Cost us a bug in Phase 4.)
 - Everything from Phase 2 onward stores `user_id` as **text**, but `chat_sessions` /
   `chat_messages` use **UUID**. When calling a Phase 2+ repo from an endpoint, wrap it:
@@ -429,6 +443,7 @@ accent  accentText  border  danger
 bubbleUser  bubbleUserText  bubbleCompanion  bubbleCompanionText
 overlay  isDark
 ```
+
 Optional per theme: `fonts`, `shape`, `wallpaper`, `wallpaperOverlay`, `wallpaperPosition`.
 
 Import: `import { useTheme } from "../context/ThemeContext";` (the shim) — both paths work.
@@ -439,6 +454,7 @@ Import: `import { useTheme } from "../context/ThemeContext";` (the shim) — bot
 isBiometricAvailable()   isBiometricEnabled()   enableBiometric(email, password)
 disableBiometric()       getStoredCredentials()  authenticateBiometric()
 ```
+
 There is **no** `getBiometricSetting` and **no** `setBiometricEnabled`. An old `App.tsx`
 imported those non-existent names and it silently sat there until a `tsc` run caught it.
 
@@ -455,6 +471,7 @@ registerPushToken(token, platform)  updateCheckinSettings(settings)
 createReminder(input)  listReminders()  deleteReminder(id)
 createGoal(input)  listGoals(status?)  updateGoal(id, patch)
 ```
+
 Types exported: `ChatReply`, `ThemeMode`, `ProfileData`, `SessionSummary`, `ServerMessage`,
 `JournalEntry`, `CheckinSettings`, `Reminder`, `Goal`.
 
@@ -470,6 +487,7 @@ getExpoPushToken()          # -> string | null  (uses projectId e8d6e6eb-…)
 scheduleLocalReminder({ title, body, date, repeatsDaily })  # -> notification id
 cancelLocal(notifId)
 ```
+
 Also sets `Notifications.setNotificationHandler` at module load so notifications show in
 foreground.
 
@@ -482,6 +500,7 @@ type Props = {
   initialMessage?: string | null;   // Phase 5 — auto-sends once, new chats only
 };
 ```
+
 Passing `sessionId = null` shows the welcome message and lets `handleSend` create the session on
 the first message. **This is why Phase 5's home input was low-risk** — the home doesn't create a
 chat, it just hands the text to ChatScreen.
@@ -598,6 +617,7 @@ type View3 =
 # SECTION 5 — SECRETS / CONFIG (values live in .env + host dashboards, NEVER committed)
 
 ## backend/.env (same keys also set in Render -> Environment)
+
 ```
 SUPABASE_URL=https://mlqbnmloighdifavttwx.supabase.co    # base URL, NO /rest/v1/
 SUPABASE_ANON_KEY=...
@@ -619,16 +639,19 @@ and in Render. Same applies to `CRON_SECRET` — regenerate it and update it in 
 cron-job.org.
 
 ## frontend/.env
+
 ```
 EXPO_PUBLIC_SUPABASE_URL=https://mlqbnmloighdifavttwx.supabase.co   # NO /rest/v1/
 EXPO_PUBLIC_SUPABASE_ANON_KEY=...
 EXPO_PUBLIC_API_URL=https://saphin-ai-backend.onrender.com          # no trailing slash
 ```
+
 `EXPO_PUBLIC_*` are baked in at **BUILD** time. Because `.env` is gitignored and EAS builds
 from git, these are **also duplicated in `frontend/eas.json`** under each profile's `env` block
 (the anon key is public by design). **If the backend URL ever changes, the APK must be rebuilt.**
 
 ## frontend/eas.json
+
 ```
 "buildType": "apk", "distribution": "internal",
 env: { EXPO_PUBLIC_API_URL, EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY }
@@ -636,6 +659,7 @@ env: { EXPO_PUBLIC_API_URL, EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_
 ```
 
 ## Supabase Auth config
+
 - Email confirmation is **ON** (no session immediately after signup -> the full name is saved on
   first login, SECTION 11 #22).
 - **Site URL** = `https://saphin-ai-backend.onrender.com/confirmed`
@@ -647,7 +671,9 @@ env: { EXPO_PUBLIC_API_URL, EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_
 - Asymmetric JWT signing (ES256); JWKS at `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`.
 
 ## Supabase Storage
+
 Public bucket **`avatars`**, policies:
+
 ```sql
 create policy "avatars public read" on storage.objects for select using ( bucket_id = 'avatars' );
 create policy "avatars user upload" on storage.objects for insert to authenticated
@@ -657,16 +683,19 @@ create policy "avatars user update" on storage.objects for update to authenticat
 ```
 
 ## Brevo (email)
+
 Account `prajasaphin18@gmail.com`; host `smtp-relay.brevo.com`, port 587 (fallback 2525),
 login `b1bea5001@smtp-brevo.com`, **SMTP key** (not the account password) generated in Brevo.
 If sending breaks, regenerate the key and update it in Supabase.
 
 ## Render
+
 Service `saphin-ai-backend`, region Oregon, root dir `backend`, build
 `pip install -r requirements.txt`, start `uvicorn app.main:app --host 0.0.0.0 --port $PORT`,
 **Free** instance, auto-deploy from `main`, Service ID `srv-d99kdlnaqgkc738augh0`.
 
 ## cron-job.org (Phase 4)
+
 - Title: `Saphin check-ins`
 - URL: `https://saphin-ai-backend.onrender.com/internal/run-checkins`  (**https**, not http)
 - Method: **POST** (set under the ADVANCED tab)
@@ -676,6 +705,7 @@ Service `saphin-ai-backend`, region Oregon, root dir `backend`, build
 - Verified: TEST RUN returned **200 OK** with `{"sent":0}`
 
 ## Expo / EAS / GitHub
+
 Expo account `saphinpraja`, project `@saphinpraja/saphin-ai`,
 projectId `e8d6e6eb-b1bf-4e21-af8b-885612a4b999`.
 GitHub: `https://github.com/Saphin18/ai-companion` (private).
@@ -685,16 +715,19 @@ GitHub: `https://github.com/Saphin18/ai-companion` (private).
 # SECTION 6 — HOW TO RUN
 
 Three terminals. Always know which one you're in.
+
 - **ROOT** = `C:\Users\saphi\Desktop\Ai-Companion` (git)
 - **FRONTEND** = `...\frontend` (expo, eas, npx tsc)
 - **BACKEND** = `...\backend` (uvicorn)
 
 **Local backend (BACKEND):**
+
 ```powershell
 cd C:\Users\saphi\Desktop\Ai-Companion\backend
 .\venv\Scripts\Activate.ps1        # you'll see (venv) appear — REQUIRED or uvicorn isn't found
 uvicorn app.main:app --reload
 ```
+
 Health local: `http://127.0.0.1:8000/health` -> `{"status":"ok"}`
 Health public: `https://saphin-ai-backend.onrender.com/health`
 (You usually DON'T need the local backend — the app points at Render.)
@@ -704,10 +737,12 @@ in a second. Running curl in the server's window (or pressing Ctrl+C first) give
 "Could not connect."
 
 **Frontend / Expo Go (FRONTEND):**
+
 ```powershell
 cd C:\Users\saphi\Desktop\Ai-Companion\frontend
 npx expo start          # add -c to clear the Metro cache
 ```
+
 `package.json` lives in `frontend`, NOT root. `-c` printing "Bundler cache is empty, rebuilding"
 is normal, not an error.
 
@@ -715,42 +750,51 @@ is normal, not an error.
 Expo Go (swipe from recents) + re-scan the QR. A shake-reload does NOT apply app.json changes.
 
 **Type-check before every build (FRONTEND):**
+
 ```powershell
 npx tsc --noEmit        # must print NOTHING
 npx expo-doctor         # should say 18/18 checks passed
 ```
 
 **Build the APK (FRONTEND):**
+
 ```powershell
 eas build -p android --profile preview
 ```
+
 Runs on Expo's servers (~20-90 min incl. queue); you can close the terminal, the link stays valid.
 A local `npx expo start` can run at the same time without interfering.
 
 **Git (ROOT):**
+
 ```powershell
 cd C:\Users\saphi\Desktop\Ai-Companion
 git add -A
 git commit -m "..."
 git push origin main
 ```
+
 Pushing `backend/` auto-redeploys Render (~3-5 min). Frontend changes do NOT trigger a deploy;
 they hot-reload in Expo, and ship only via an APK rebuild.
 `eas build` uploads **local files**, not GitHub — so a push isn't required to build, but do it
 anyway as backup.
 
 **Writing files from PowerShell (the pattern that works):**
+
 ```powershell
 @'
 ...content...
 '@ | Set-Content -Path "path\file.ts" -Encoding utf8
 ```
+
 For surgical edits to an existing file, read -> `.Replace(old, new)` -> write, and guard it:
+
 ```powershell
 $c = Get-Content -Raw -Path $p
 if ($c.Contains($old)) { $c = $c.Replace($old,$new); Set-Content -Path $p -Value $c -Encoding utf8; Write-Host "APPLIED" }
 else { Write-Host "NO MATCH - do not save" }
 ```
+
 `.Replace()` **fails silently** if the text doesn't match exactly — always verify afterwards
 with `Select-String`.
 
@@ -869,6 +913,7 @@ alter table public.goals enable row level security;
 is obsolete — delete it.)*
 
 ## Original vision vs what shipped
+
 Originally: multiple **anime-INSPIRED** themes (One Piece, Naruto, Demon Slayer, AoT, DBZ,
 Spy x Family, Violet Evergarden, Your Lie in April) using ONLY original colors/art — no
 copyrighted characters, logos, or official images.
@@ -882,6 +927,7 @@ specific photo is copyrighted even if the subject isn't). Use **Unsplash / Pexel
 add a soft dark overlay for legibility; avoid recognizable faces, logos, and protected landmarks.
 
 ## Token contract — `frontend/src/theme/types.ts`
+
 ```ts
 export type ThemeMode = "dark" | "light" | "system";
 export type ThemeVariant = {
@@ -904,6 +950,7 @@ export type ThemeDefinition = {
 ```
 
 ## Build stages (all DONE)
+
 - **Stage 0 — Engine:** `types.ts`, `registry.ts`, `ThemeContext.tsx`, `themes/default/` (original
   colors migrated losslessly). Backend `theme_id` column + `updateThemeId()` in api.ts. App looked
   identical; engine live.
@@ -915,6 +962,7 @@ export type ThemeDefinition = {
   photo + whole-screen dim + top/bottom `LinearGradient` for legibility, `pointerEvents="none"`.
 
 ## Tuning cheatsheet (`themes/nature/index.ts`)
+
 - `"center"/"top"/"bottom"` = which part of the photo shows (uses `expo-image`'s
   `contentPosition`; RN's built-in `<Image>` can't do this — that's why `expo-image` was added).
 - Raise overlay alpha (`0.15` -> `0.30`) = darker, more readable text; lower = brighter photo.
@@ -923,6 +971,7 @@ export type ThemeDefinition = {
   the bundler crashes.
 
 ## Open polish (optional)
+
 Owner's verdict: **img2, img3, img4 + Grand Line are the keepers**; img1 (pale stone) and img5
 (swans) are weak. Owner chose NOT to trim — all 5 still ship. Also: some source photos are
 multi-MB; resize to ~1080-1440px / ~300-600 KB if load ever feels slow on cheap phones.
@@ -936,6 +985,7 @@ Any native module means: keep `newArchEnabled:false`, commit, rebuild, re-test o
 # SECTION 9 — PHASE 3 DETAIL (D22)
 
 **Owner decisions locked:**
+
 - Personality = **"both"**: the user picks a style AND detected mood nudges the tone on top.
 - Styles = all four: Balanced, Motivator, Humor, Calm.
 - Journal = full "diary that responds": user writes, companion writes ONE short caring reflection.
@@ -971,12 +1021,14 @@ personality pills change the voice; journal entry saves, reflection appears, ent
 ## 10.1 Phase 4 — Proactivity (D23)
 
 ### Owner decisions
+
 - Wanted **AI-written** notifications ("not the same notification all the time") -> remote push
   for the check-in, not a canned local message.
 - Build **all three** features (check-in, reminders, goals) in one go so they share one rebuild.
 - Check-in message style: one warm line, freshly generated.
 
 ### How the check-in actually works
+
 1. cron-job.org POSTs `/internal/run-checkins` every 15 min with the `X-Cron-Secret` header.
    *This call also wakes the sleeping Render free instance* — that's why no paid tier is needed.
 2. The endpoint rejects anything without a matching `settings.cron_secret` (403).
@@ -993,23 +1045,27 @@ personality pills change the voice; journal entry saves, reflection appears, ent
 -> **-345**). Store it verbatim; the math above depends on that sign.
 
 ### Reminders (local)
+
 `RemindersScreen` -> title + time picker + optional "repeat daily" -> on save:
 `requestPermission()` -> `ensureAndroidChannel()` -> `scheduleLocalReminder(...)` ->
 `POST /reminders` (stores the returned `local_notif_id` so delete can cancel it). If the time has
 already passed today and it isn't daily, it schedules for tomorrow.
 
 ### Goals (prompt injection)
+
 `GoalsScreen` -> add/list/mark done. `chat.py` loads `active_goal_titles()` and folds them into
 `memory_context` (so `generate_reply`'s signature never changed) with "gently support and
 encourage these when relevant, never nag."
 
 ### Robustness fix worth keeping
+
 `persistCheckin` in ProfileScreen **saves the user's preference FIRST, always**, then does
 push-token registration as a separate best-effort step. Earlier the order was reversed, so a
 failed token fetch abandoned the save and the toggle silently flipped back off. Only a genuine
 save failure reverts the toggle now.
 
 ### Files added/changed in Phase 4
+
 **Backend NEW:** `models/reminder.py`, `models/goal.py`, `models/push.py`,
 `repositories/reminder_repository.py`, `repositories/goal_repository.py`,
 `repositories/push_repository.py`, `repositories/checkin_repository.py`,
@@ -1023,6 +1079,7 @@ save failure reverts the toggle now.
 `screens/ProfileScreen.tsx` (DAILY CHECK-IN section), `App.tsx` (push registration + tap handler).
 
 ### Verified working
+
 - Wrong secret -> `{"detail":"forbidden"}`; correct secret -> `{"sent":0}` (local AND live).
 - cron-job.org TEST RUN -> **200 OK**, `x-render-origin-server: uvicorn`.
 - Goals + reminders save and list correctly in Expo Go.
@@ -1030,6 +1087,7 @@ save failure reverts the toggle now.
 ## 10.2 Phase 5 — Navigation redesign (D24)
 
 ### What the owner asked for (after showing Claude + ChatGPT as references)
+
 - Home like Claude/ChatGPT: mostly empty, hamburger top-left, avatar top-right, a greeting, and a
   **real** chat input at the bottom ("Option B" — type on home, it opens the chat and auto-sends).
 - Chat history moves into the **left drawer** along with all navigation.
@@ -1037,6 +1095,7 @@ save failure reverts the toggle now.
 - The owner explicitly rejected a hint line like "tap for menu" as looking unpolished.
 
 ### Final layout
+
 - **Home** (`ChatsListScreen`): hamburger (left) - avatar (right -> Profile) - "Hey {firstName},
   how are you feeling today?" - rounded input bar with an up-arrow send button.
 - **Drawer:** "Saphin AI" title -> **New chat** -> divider -> Journal, Reminders, Goals,
@@ -1044,14 +1103,17 @@ save failure reverts the toggle now.
 - **Profile:** completely unchanged.
 
 ### Why it was safe
+
 The chat list's `handleTogglePin`, `openRename`, `submitRename`, `handleRemove` and both modals
 were copied **verbatim** into the new file; only the surrounding layout changed. Tap vs long-press
 are separate gestures on separate elements, so the drawer can't interfere.
 
 ### The one bug found in testing (and its fix)
+
 **Back button while the drawer was open exited the app** instead of closing the drawer — because
 `App.tsx`'s back handler only knows about *screens*, and the drawer's state lives inside
 `ChatsListScreen`. Fixed by registering a second `BackHandler` **inside ChatsListScreen**:
+
 ```ts
 useEffect(() => {
   const onBack = () => { if (drawerOpen) { closeDrawer(); return true; } return false; };
@@ -1059,16 +1121,19 @@ useEffect(() => {
   return () => sub.remove();
 }, [drawerOpen]);
 ```
+
 RN runs the most recently registered handler first, so the home's handler wins while it's mounted.
 **Verified working.**
 
 ### Files added/changed in Phase 5
+
 **NEW:** `screens/AboutScreen.tsx`.
 **REWRITTEN:** `screens/ChatsListScreen.tsx` (home + drawer), `App.tsx` (about view,
 `onStartChatWithMessage`, `onOpenAbout`).
 **MODIFIED:** `screens/ChatScreen.tsx` (optional `initialMessage` + one-shot auto-send).
 
 ### Verified working in Expo Go
+
 Home layout, avatar -> Profile, typing on home -> chat opens and auto-sends -> companion replies,
 drawer slide + backdrop close, all four drawer destinations, tapping a recent chat,
 long-press -> pin/rename/remove all functioning, back button closes the drawer.
@@ -1078,6 +1143,7 @@ long-press -> pin/rename/remove all functioning, back button closes the drawer.
 # SECTION 11 — MISTAKES WE HIT & FIXES (the full list)
 
 ## Early / setup
+
 1. **Two `Ai-Companion` folders** (Users vs Desktop) — files split across both. Fixed with
    robocopy /MOVE into one Desktop folder; deleted the empty leftover.
 2. **Python 3.14 too new** — `pydantic-core` had no prebuilt wheel and tried to compile Rust.
@@ -1097,6 +1163,7 @@ long-press -> pin/rename/remove all functioning, back button closes the drawer.
     staged before committing.
 
 ## Phase 1
+
 12. **`ModuleNotFoundError: psycopg2`** — `DATABASE_URL` started with `postgresql://`. Use
     `postgresql+asyncpg://`.
 13. **`AttributeError: get_provider`** — the factory is `get_ai_provider()`.
@@ -1109,6 +1176,7 @@ long-press -> pin/rename/remove all functioning, back button closes the drawer.
 17. **Android keyboard covering inputs** — early fix (`behavior="height"` + pan) superseded by #26.
 
 ## Deployment
+
 18. **Render build OK but crash at startup** — `requirements.txt` missing `sqlalchemy`/`asyncpg`.
     Added `sqlalchemy[asyncio]>=2.0.0` and `asyncpg>=0.29.0`.
 19. **Python 3.14 wheels missing on Render** — added `backend/.python-version` = `3.12.7`.
@@ -1126,6 +1194,7 @@ long-press -> pin/rename/remove all functioning, back button closes the drawer.
 25. **"localhost can't be reached" after email confirm** — Supabase Site URL pointed at localhost.
 
 ## Keyboard / UI
+
 26. **THE KEYBOARD BUG (the big one — took many tries).** Symptoms: input flung to the top with a
     big gap; header disappeared; keyboard covered input. **Root cause:** `newArchEnabled: true`
     (added later by `eas build:configure`) changed Android keyboard/`KeyboardAvoidingView`
@@ -1168,6 +1237,7 @@ long-press -> pin/rename/remove all functioning, back button closes the drawer.
     nesting them is invalid in React Native.
 
 ## Theme system
+
 34. **`SyntaxError: biometrics.ts:53:38`** (owner-fixed) — the `getStoredCredentials()` return-type
     annotation. If it recurs, look there.
 35. **"Can't scroll" after adding the Theme card** (owner-fixed) — same family as #33.
@@ -1180,6 +1250,7 @@ long-press -> pin/rename/remove all functioning, back button closes the drawer.
     cover the app-wide `Background`. Fix: set that screen's root to `backgroundColor:"transparent"`.
 
 ## Phase 3
+
 39. **Wrong filename in an instruction** — `ChatListScreen` vs the real `ChatsListScreen`
     (note the **s**) made Notepad create an empty 0 KB file. Delete it and use the correct name.
 40. **"Something went wrong" on first Expo launch after many edits** — stale Metro cache. Fix:
@@ -1187,6 +1258,7 @@ long-press -> pin/rename/remove all functioning, back button closes the drawer.
     No code was actually broken.
 
 ## Phase 4 / 5 (most recent session)
+
 41. **Guessed API names that didn't exist.** Wrote `settings.GROQ_API_KEY` (it's lowercase) and
     `Profile.user_id` (it's `Profile.id`), and imported `getBiometricSetting` /
     `setBiometricEnabled` from biometrics (they don't exist). **Cause: writing code against a
@@ -1228,10 +1300,12 @@ long-press -> pin/rename/remove all functioning, back button closes the drawer.
 Nothing is blocking. Everything below is polish or a new feature area.
 
 **Immediate:**
+
 - Install and smoke-test the new APK (see 0.1).
 - Rotate the exposed Supabase DB password + `CRON_SECRET` (SECTION 5).
 
 **Optional polish:**
+
 - Trim the wallpaper picker to img2/img3/img4 + Grand Line; resize multi-MB photos.
 - Reminder **editing** (currently create/delete only) and recurrence beyond "daily".
 - Quiet hours for the check-in; per-reminder timezone handling after travel.
@@ -1239,6 +1313,7 @@ Nothing is blocking. Everything below is polish or a new feature area.
 - Rich push (images/actions).
 
 **Optional features:**
+
 - **Google Sign-In**, then **Apple Sign-In** (Apple is required by the App Store once another
   social login exists).
 - Custom avatar crop screen (needs a native crop package + dev build — risky, see #27).
@@ -1265,6 +1340,7 @@ The keystore was auto-generated in the cloud. (Ignore any `adb ENOENT` error at 
 just the optional "run on emulator" step; the APK is already built.)
 
 **Watch-outs before/after any build:**
+
 - `SUPABASE_SERVICE_ROLE_KEY` MUST be in Render's env (for `DELETE /account`).
 - `DATABASE_URL` must keep `postgresql+asyncpg://` and `%40` for any `@` in the password.
 - If the backend URL changes -> **rebuild the APK** (baked at build time).
@@ -1276,6 +1352,7 @@ just the optional "run on emulator" step; the APK is already built.)
 - Supabase **Redirect URLs** must list both `/reset-password` and `/confirmed`.
 
 **Pre-build checklist (FRONTEND):**
+
 ```powershell
 npx tsc --noEmit        # must print nothing
 npx expo-doctor         # must be 18/18
@@ -1302,6 +1379,7 @@ A populated README comes near launch.
 `THEME_SYSTEM_KICKOFF.md`, and `PHASE_4_KICKOFF.md`.
 
 ---
+
 ---
 
 # SECTION 15 — PHASE 4 FULLY VERIFIED + FCM PUSH SETUP (added 19 July 2026)
@@ -1337,6 +1415,7 @@ fields**, so `payload.model_dump(exclude_unset=True)` returned `{}` → nothing 
 field must travel over the API, it must ALSO exist in the Pydantic In/Out schema.
 
 **Fix — `backend/app/models/profile.py` now reads:**
+
 ```python
 """Request/response schemas for the profile API."""
 from datetime import date
@@ -1370,6 +1449,7 @@ class ProfileUpdate(BaseModel):
     checkin_minute: int | None = None
     checkin_tz_offset_minutes: int | None = None
 ```
+
 Note `last_checkin_date` is deliberately **absent from `ProfileUpdate`** — only the server writes
 it. Backend-only change; pushed to Render, no APK rebuild needed.
 
@@ -1391,6 +1471,7 @@ is the *signing keystore* — a completely different thing. `eas credentials` sh
 ### The full setup that fixed it (do this once per project; future builds inherit it)
 
 **A. Firebase project**
+
 1. https://console.firebase.google.com → **Create a project** → name `Saphin AI`
    (Google Analytics can be off; if the wizard insists, picking an existing account is harmless).
 2. On the project page → **+ Add app** → **Android**.
@@ -1406,6 +1487,7 @@ is the *signing keystore* — a completely different thing. `eas credentials` sh
    *(The Google Cloud "IAM → Service accounts" page is NOT needed — it's a side page.)*
 
 **C. Put the files in place (FRONTEND)**
+
 ```powershell
 cd C:\Users\saphi\Desktop\Ai-Companion\frontend
 Move-Item "$env:USERPROFILE\Downloads\google-services.json" -Destination "google-services.json" -Force
@@ -1414,20 +1496,24 @@ Add-Content -Path "..\.gitignore" -Value "`r`n# Firebase FCM service account (SE
 ```
 
 **D. Point app.json at the config file** — inside the `android` block:
+
 ```json
 "package": "com.saphin.ai",
 "googleServicesFile": "./google-services.json"
 ```
 
 **E. Verify the secret is NOT staged (ROOT) — never skip this**
+
 ```powershell
 git status --short      # fcm-service-account.json must NOT appear
 ```
 
 **F. Upload the key to Expo (FRONTEND)**
+
 ```powershell
 eas credentials
 ```
+
 → **Android** → **preview** (that's the profile the APK is built with; `production` is unused)
 → **Google Service Account**
 → **Manage your Google Service Account Key for Push Notifications (FCM V1)**
@@ -1435,22 +1521,27 @@ eas credentials
 → it auto-detects `fcm-service-account.json` → **yes**
 
 Success looks like:
+
 ```
 ✔ Uploaded Google Service Account Key.
 ✔ Google Service Account Key assigned to com.saphin.ai for FCM V1
 ```
+
 and the summary flips from `None assigned yet` to showing Project ID `saphin-ai`.
 
 **G. Rebuild** — FCM only takes effect in a NEW build:
+
 ```powershell
 npx tsc --noEmit ; npx expo-doctor
 cd C:\Users\saphi\Desktop\Ai-Companion
 git add -A ; git commit -m "Add Firebase FCM config for push notifications" ; git push origin main
 cd frontend ; eas build -p android --profile preview
 ```
+
 Then **download and install the new APK** — the old installed app never updates itself.
 
 ### File / secret rules that came out of this
+
 - `frontend/google-services.json` → **committed to git. Safe.** It only identifies the app.
 - `frontend/fcm-service-account.json` → **SECRET, gitignored, never commit, never paste in chat.**
 - Both live in the `frontend` folder.
@@ -1466,12 +1557,14 @@ worked; the schedule did nothing.
 with the failure reason **"Failed (output too large)"** and *"Next Runs: No upcoming executions."*
 
 Two things combined:
+
 - **"Save responses in job history" was ON.** cron-job.org stores each response and enforces a
   size limit; exceeding it is counted as a **failure**.
 - The **"disable the cronjob because of too many failures"** notification/safety toggle was ON,
   so after repeated "failures" cron-job.org **switched the job off entirely**.
 
 **Fix (cron-job.org → Cronjobs → Saphin check-ins → Edit):**
+
 - **Enable job: ON**
 - **Save responses in job history: OFF**  ← this is what caused the failures
 - Schedule: **Every 1 minute** (`* * * * *`)
@@ -1494,6 +1587,7 @@ Owner asked for exact-time delivery. Two coordinated changes:
    ```
 
 **Consequences to remember:**
+
 - A check-in now lands within ~1 minute of the chosen time.
 - The Render free instance is now pinged 1,440×/day, so it effectively **stays awake** — a bonus
   side effect is no more ~50-second cold starts anywhere in the app. Render's free 750 h/month
@@ -1527,9 +1621,11 @@ Owner asked for exact-time delivery. Two coordinated changes:
    Blue Expo Go = it only reached Expo Go.
 
 Manual trigger (only inside the 2-minute window):
+
 ```powershell
 curl.exe -X POST https://saphin-ai-backend.onrender.com/internal/run-checkins -H "X-Cron-Secret: <CRON_SECRET>"
 ```
+
 `{"sent":1}` = sent · `{"sent":0}` = declined (disabled / already sent today / outside window).
 
 ## 15.7 Housekeeping: duplicate notifications
@@ -1556,6 +1652,7 @@ then **reverted at the owner's request**. `RemindersScreen.tsx` is back to origi
 ## 15.9 AMENDMENTS to earlier sections (add-only; these supersede)
 
 **To SECTION 2 (project structure)** — new files in `frontend/`:
+
 ```
 frontend/google-services.json        # Firebase config, COMMITTED (safe)
 frontend/fcm-service-account.json    # Firebase private key, GITIGNORED (SECRET)
@@ -1565,6 +1662,7 @@ frontend/fcm-service-account.json    # Firebase private key, GITIGNORED (SECRET)
 check-in fields exactly as listed in 15.1. Any code touching check-in settings must use them.
 
 **To SECTION 5 (secrets/config)** — additions:
+
 - Firebase project `saphin-ai`, Spark plan, Android package `com.saphin.ai`.
 - `frontend/fcm-service-account.json` is a **secret** (gitignored).
 - EAS `preview` profile now has **FCM V1 Google Service Account Key assigned**.
@@ -1609,6 +1707,7 @@ SECTION 12's list still stands and is still all optional. Updated only where tod
 **Done since SECTION 12 was written:** install + smoke-test the APK ✅, and remote push now works ✅.
 
 **Still outstanding / recommended next:**
+
 - 🔴 **Rotate the exposed secrets** — Supabase DB password (update `DATABASE_URL` locally AND on
   Render) and `CRON_SECRET` (update on Render AND cron-job.org). Highest-priority housekeeping.
 - Delete the stale Expo Go row from `push_tokens` (15.7).
@@ -1641,3 +1740,601 @@ hadn't carried over. Recorded here so nothing from the original notes is lost:
 
 Everything else from all previous versions (setup history, Phase 1–3 build logs, theme staging,
 deployment steps, every numbered mistake) is already present in SECTIONS 0–14 above.
+
+---
+
+---
+
+# SECTION 16 — PHASE 6: ATTACHMENTS (voice, images, documents) — added 25 July 2026
+
+> **This section was APPENDED after everything above. Nothing above was changed except the
+> status note in 0.1.** Where this contradicts an earlier section, **this section wins** — it
+> is the newest.
+>
+> **Headline: Phase 6 BACKEND is complete, tested against real files, and committed (not pushed).
+> The Phase 6 FRONTEND is written, passes `tsc` and `expo-doctor` 18/18, and an APK build was
+> started — but NOTHING has been tested on a real device yet. Expo Go can no longer run this app.**
+
+## 16.0 What Phase 6 adds
+
+Three features, one rebuild, all on the **existing Groq key**. No new provider, no billing,
+no Gemini-in-Nepal problem.
+
+| Feature                   | Model / method                      | Tested?                                        |
+| ------------------------- | ----------------------------------- | ---------------------------------------------- |
+| Voice message → text     | `whisper-large-v3-turbo` (Groq)   | ✅ backend tested                              |
+| Image → text description | `qwen/qwen3.6-27b` (Groq, vision) | ✅ backend tested                              |
+| PDF / DOCX → text        | `pypdf` + `python-docx`, NO AI  | ✅ backend tested (resume extracted perfectly) |
+| Companion reply → speech | `expo-speech`, on-device          | ⏳ not tested on device                        |
+
+**The voice UX chosen (D29 below): the HYBRID bubble** — a play button + waveform, with the
+transcript shown underneath in smaller, dimmer text. Not voice-only, not text-only.
+
+## 16.1 CRITICAL — Groq model findings (verified 25 July 2026 by live probe, not guessed)
+
+The Groq account has **15 models**. Only ONE accepts images:
+
+- **`qwen/qwen3.6-27b` — THE ONLY VISION MODEL.** Confirmed by sending a real 64×64 red PNG and
+  getting "This image is a solid red square." It is the model image-reading depends on.
+- `llama-3.3-70b-versatile` (the main chat model) is **TEXT-ONLY**. It rejects image messages with
+  `messages[0].content must be a string`.
+- Same rejection from `groq/compound`, `openai/gpt-oss-120b`, `llama-3.1-8b-instant`.
+- `meta-llama/llama-4-scout-17b-16e-instruct` → **404, no access.** Gone from this account.
+- `whisper-large-v3` and `whisper-large-v3-turbo` are both available (we use turbo).
+- `canopylabs/orpheus-v1-english` is a **text-to-speech** model — unused, but a future option for
+  giving the companion a real generated voice instead of the phone's built-in one.
+
+**Qwen is a REASONING model.** It emits a `<think>...</think>` block before the real answer. Two
+ways to handle it, both implemented in `vision_reader.py`: (1) preferred — pass
+`reasoning_effort="none"` to suppress the thinking (faster, cheaper); (2) fallback — let it think,
+then strip the block with regex. Both tested and working.
+
+**How to test whether ANY model has vision (the probe trick, learned the hard way):**
+Send an image and READ THE ERROR — don't just check pass/fail.
+
+- `"messages[0].content must be a string"` = **NO vision** (rejects the multimodal format).
+- `"Image must have at least 2 pixels in each dimension"` = **HAS vision** (it decoded the image
+  and measured it). A 1×1-pixel test image triggers this — the first probe used one and was
+  mislabelled as failure, which nearly killed the whole feature. Use a real ≥64×64 image.
+
+## 16.2 Architecture — how attachments reach the AI (NO provider change)
+
+**`groq_provider.py` and `base.py` were NOT touched.** Same trick as Phase 4D goals: everything
+is folded into `memory_context` as text, so `generate_reply`'s signature never changed.
+
+- **Voice**: the transcript BECOMES `chat_messages.content`. It is NOT injected as context — it
+  *is* the message. This is why memory extraction, mood detection, and chat titles (D9, first 40
+  chars) all keep working with zero changes.
+- **Image**: Qwen's description is injected as a text block into `memory_context`.
+- **Document**: the extracted text is injected as a text block into `memory_context`.
+
+**Flow:** `POST /attachments` (store file → read it to text → save row, returns an id) → then
+`POST /chat` with `attachment_ids: [...]` → the text is injected → the attachment is linked to the
+saved message so history can render the bubble later.
+
+**The file is always stored BEFORE the AI reads it.** If Whisper or Qwen fails, `extracted_text`
+is null but the original recording/image/document is never lost.
+
+**Known v1 limit (by design):** attachment text is only given to the AI on the message it arrives
+with. "Summarise this PDF" works; asking about it 3 messages later does NOT (the text isn't kept
+in history — feeding 15k chars every turn would blow Groq's rate limit). Fix later: store a short
+summary alongside the full text.
+
+## 16.3 Files (Phase 6)
+
+### Backend — NEW
+
+```
+backend/app/ai/transcriber.py           # Whisper. Best-effort, returns None on failure.
+backend/app/ai/vision_reader.py         # Qwen vision + <think> stripping. Best-effort.
+backend/app/ai/doc_reader.py            # pypdf / python-docx. NO AI. 5 MB / 15k char caps.
+backend/app/api/attachments.py          # POST /attachments, GET /attachments/{id}/url
+backend/app/models/attachment.py        # AttachmentOut (Pydantic)
+backend/app/repositories/attachment_repository.py
+backend/app/services/storage.py         # Supabase Storage via httpx + service-role key
+                                        #   (first backend code to touch Storage; avatars
+                                        #    upload from the phone instead — D14)
+```
+
+### Backend — MODIFIED
+
+```
+backend/app/api/chat.py                 # attachment fetch + injection + linking (see 16.2)
+backend/app/models/chat.py              # ChatRequest +attachment_ids IN; MessageOut +attachments OUT
+backend/app/db/models.py                # +Attachment ORM class (appended)
+backend/app/main.py                     # registered the attachments router
+backend/app/auth/dependencies.py        # clock-skew + JWKS hardening fix (see 16.7 bugs #58/#59)
+backend/requirements.txt                # +pypdf, +python-docx, +python-multipart
+```
+
+### Frontend — NEW / MODIFIED
+
+```
+frontend/src/services/attachments.ts    # NEW. uploadAttachment(), sendChatWithAttachments(),
+                                        #   refreshAttachmentUrl(). Kept separate so api.ts
+                                        #   stays untouched. Retries once on 401.
+frontend/src/types/chat.ts              # MODIFIED. +Attachment type, +attachments? on ChatMessage.
+frontend/src/components/ChatBubble.tsx  # MODIFIED. Hybrid voice bubble + image thumb + doc chip.
+frontend/src/components/ChatInput.tsx   # MODIFIED. Mic button, attach (+) menu, pending chips,
+                                        #   hands-free long-press.
+frontend/src/screens/ChatScreen.tsx     # MODIFIED. Hands-free turn mode + expo-speech playback.
+frontend/app.json                       # MODIFIED. +RECORD_AUDIO, +expo-audio plugin (mic perm),
+                                        #   +expo-asset plugin.
+```
+
+### Frontend packages added (Phase 6)
+
+`expo-audio` (recording), `expo-document-picker`, `expo-speech`, and `expo-asset`
+(peer dependency of expo-audio — MUST be installed, or the APK can crash even though Expo Go
+looked fine). Installed with `npx expo install`, then `npm dedupe`, until `npx expo-doctor` = 18/18.
+`expo-image-picker` was already present from the avatar work.
+
+## 16.4 Database + Storage (Phase 6)
+
+**Table `attachments`** — run in **Supabase → SQL Editor (browser, NOT a terminal)**:
+
+```sql
+create table if not exists public.attachments (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,
+  session_id uuid,
+  message_id uuid,
+  kind text not null,                 -- 'voice' | 'image' | 'document'
+  storage_path text not null,
+  mime_type text,
+  original_name text,
+  size_bytes int,
+  duration_ms int,
+  extracted_text text,                -- transcript / description / document text
+  hidden_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists attachments_user_id_idx on public.attachments (user_id);
+create index if not exists attachments_message_id_idx on public.attachments (message_id);
+alter table public.attachments enable row level security;
+```
+
+Follows the Phase 2+ convention: `user_id` is **text** (wrap with `str(user_id)` in backend calls),
+`session_id`/`message_id` are UUID, RLS enabled with no policies, `hidden_at` for soft delete
+(rule 0.4 #1 — attachments are chat data, never hard-deleted).
+
+**Storage bucket `attachments`** — created in Supabase → Storage:
+
+- **Public: OFF** — this is a PRIVATE bucket, unlike the public `avatars` bucket. A voice note or
+  a PDF is not a profile picture.
+- No policies needed. The backend uses the service-role key (which bypasses RLS) and is the only
+  thing that touches it. It serves **1-hour signed URLs** to the app.
+- Path convention: `attachments/<user_id>/<attachment_id>.<ext>`.
+
+## 16.5 ORM contract for `Attachment` (add to SECTION 3.1's table)
+
+| Model          | Table           | user id column             | Notes                                                                                                                 |
+| -------------- | --------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `Attachment` | `attachments` | `user_id` **text** | `kind` voice/image/document; nullable `session_id`, `message_id`; `extracted_text`; `hidden_at` soft delete |
+
+## 16.6 PRODUCT DECISIONS locked in Phase 6 (do not silently reverse)
+
+- **D29 — Hybrid voice bubble.** Waveform + play button, with the transcript underneath in
+  smaller/dimmer text. NOT voice-only, NOT text-only. Reasons: the transcript is generated anyway
+  (the chat model is text-only), hiding it would be dishonest when Whisper mishears, and a
+  voice-only message that STARTS a chat would give it a blank title (D9 needs text).
+- **D30 — No "review transcript before sending".** It kills the speed that makes voice worth
+  using. The audio is kept, so nothing is truly lost if Whisper mishears. Revisit only if
+  transcription proves bad in practice.
+- **D31 — Hands-free TURN mode, NOT realtime voice.** Long-press the mic → the companion speaks
+  its reply aloud (expo-speech) and then reopens the mic, so a whole conversation needs no taps.
+  It is turn-based (you can't interrupt mid-sentence). True realtime (ChatGPT voice-mode style)
+  needs raw PCM streaming = bare native modules = a dev build, PLUS a paid realtime provider
+  (Groq has none; Anthropic needs billing #8, Gemini is zero-quota in Nepal #9). **Deferred to a
+  future Phase 7 with its own budget.**
+- **D32 — Attachments follow chat data: SOFT DELETE only** (rule 0.4 #1). Voice notes stay
+  playable in the bubble, WhatsApp-style.
+- **D33 — Documents NEVER touch an AI on upload.** PDF/DOCX are parsed by pure Python
+  (`doc_reader.py`); only images go to a model (Qwen). Say this plainly to users. The document's
+  text only reaches the AI later, when the user actually attaches it to a chat message.
+
+## 16.7 BUGS FOUND & FIXED in Phase 6 (continuing SECTION 11 numbering)
+
+Two were PRE-EXISTING and unrelated to attachments — found only because Phase 6 exercised auth
+harder than before.
+
+58. **Clock skew logged users out at random — WAS ALREADY IN THE LIVE APP.**
+    Symptom: apparently random `401 "Invalid or expired session"` that vanished on retry.
+    Real cause: `jwt.decode` in `auth/dependencies.py` had **zero leeway**, and the Windows clock
+    was ~2 seconds behind Supabase, so a freshly issued token looked like it came from the future
+    (`ImmatureSignatureError: The token is not yet valid (iat)`).
+    **Fix:** `leeway=timedelta(seconds=30)` in `jwt.decode`. Also run Windows "Sync now".
+    **Lesson: intermittent 401s → suspect clock skew before anything else.**
+59. **Network failure reported as "invalid session".**
+    `dependencies.py` caught `httpx.HTTPError` in the SAME `except` as JWT errors, so an
+    unreachable JWKS key server told the user "log in again" — advice that cannot help. The JWKS
+    cache is a module-level global, so it is **empty after every restart** (Render cold start,
+    uvicorn --reload), making a fetch failure at the wrong moment log everyone out.
+    **Fix:** the JWKS fetch now retries 3×; on total failure it KEEPS the stale cache instead of
+    clearing it (a slightly stale signing key beats a false logout); a bad token → **401**, an
+    unreachable key server → **503 "try again in a moment"**. Honest labels (rule 0.4 #1 spirit).
+60. **`Set-Content -Encoding utf8` writes a BOM.** Python imports handle it fine (this is why
+    everything works), but reading such a file in a script with `encoding='utf-8'` raises
+    `SyntaxError: invalid non-printable character U+FEFF`. **Use `encoding='utf-8-sig'` when
+    reading these files back in a script.** (A verification command failed on this, not the file.)
+61. **`Out-File` mangles non-ASCII characters** (turned `‹` and `…` into `?`). Rewriting a file
+    from such a dump would bake corruption into the app. **Always dump code with
+    `Get-Content -Encoding utf8 | ... | Set-Content -Encoding utf8`, or `Add-Content -Encoding utf8`.**
+62. **`pip.exe` blocked by Windows Application Control**
+    (`Program 'pip.exe' failed to run: An Application Control policy has blocked this file`).
+    **Fix: always use `python -m pip install ...`, never bare `pip`.** (Does not affect Render,
+    which runs its own pip on Linux.)
+63. **SQL pasted into PowerShell = a wall of red parser errors, does nothing.** SQL belongs in the
+    Supabase browser SQL Editor ONLY. Nothing broke, but it wasted time. See 16.9 labelling rule.
+
+## 16.8 Phase 6 traps (things that will bite the next session)
+
+- **Do NOT set `Content-Type` on the upload `fetch`.** `fetch` must add the multipart boundary
+  itself; overriding it silently breaks the upload. (`attachments.ts` deliberately omits it.)
+- `uploadAttachment` **retries once on 401** — uploads are slow and a token can expire mid-flight.
+  Losing a voice recording to an expired session is miserable, hence the retry.
+- `attachments.user_id` is **text**; `chat_sessions`/`chat_messages` are **UUID**. Wrap with
+  `str(user_id)` for attachment calls (mistake #38 / #41 territory).
+- **Every new field must be in the Pydantic schema AND the ORM** (mistake #51). Phase 6 added
+  `attachment_ids` (In) and `attachments` (Out) to `models/chat.py` in the same session.
+- `python-multipart` is REQUIRED for file uploads — FastAPI won't accept files without it and the
+  failure message is confusing.
+- `expo-audio` needs `expo-asset` as a peer dep, plus `npm dedupe`, or **the APK may crash even
+  though Expo Go looked fine** (`expo-doctor` catches this — run it BEFORE building, #48).
+- **`app.json` lives in `frontend/`, not the repo root.** A stray copy at the root does nothing and
+  hides the fact that the real one was never updated. After editing it, verify with:
+  `Get-Content app.json | Select-String -Pattern "RECORD_AUDIO|microphonePermission"`.
+
+## 16.9 NEW WORKFLOW RULE (add to SECTION 0.3)
+
+**Label EVERY command block with where it runs:**
+
+| Label              | Where it goes                                        |
+| ------------------ | ---------------------------------------------------- |
+| `FRONTEND`       | PowerShell, in`frontend\`                          |
+| `BACKEND`        | PowerShell, in`backend\`                           |
+| `SUPABASE (SQL)` | **Browser SQL Editor ONLY. NEVER a terminal.** |
+
+Also: keep pasted PowerShell blocks to **one command each** where possible — multi-command blocks
+with blank lines leave the terminal stuck at `>>`. **`Ctrl+C` escapes safely** and cancels nothing
+important. For long file contents, write to a file and read it, always with `-Encoding utf8`.
+
+## 16.10 CONTINUATION PROMPT UPDATE
+
+The 0.2 continuation prompt should now say: *"We have completed planning, Phase 1, Phase 2,
+Phase 3, Phase 4, Phase 5, and the Phase 6 backend (attachments). The Phase 6 frontend is written
+but not yet tested on a device."*
+
+## 16.11 WHAT'S NEXT — Phase 6 (highest priority first)
+
+1. 🔴 **TEST THE APK.** Nothing on the device is verified. **Expo Go now CRASHES** ("Something
+   went wrong") because `expo-audio` and `expo-document-picker` are native modules it doesn't
+   contain — this is permanent, the same lesson as #31/#49/#54. Test on the real APK:
+   record → send → play back the voice note; attach a photo and ask about it; attach a PDF and ask
+   about it; long-press the mic for hands-free and confirm the reply is spoken aloud.
+2. 🔴 **Rotate the exposed Supabase DB password** (`DATABASE_URL` locally AND on Render) and
+   `CRON_SECRET` (Render AND cron-job.org). *Still outstanding from SECTION 15.*
+3. 🟠 **Build a development build** — `eas build --profile development`, then
+   `npx expo start --dev-client`. This restores instant hot-reload for native modules and would
+   have saved hours this session. Strongly recommended before any more native work.
+4. 🟠 **Push the backend to Render.** Phase 6 backend is committed but NOT pushed. Pushing
+   deploys automatically — do it once the app half is confirmed working on the APK.
+5. 🟡 Add the FCM key to the `production` EAS profile (15.11 carry-over).
+6. 🟡 Delete the stale Expo Go row from `push_tokens` (15.7 carry-over).
+7. 🟡 Clear the Phase 6 TEST uploads from the `attachments` table + bucket (a resume PDF, an API
+   screenshot, and a couple of voice notes were uploaded during backend testing).
+8. 🟡 Consider a per-attachment summary so the AI can discuss a document across multiple messages
+   (the v1 limit in 16.2).
+
+**Nothing is blocking. The Phase 6 backend is solid and tested; the frontend just needs its first
+real-device run.**
+
+
+---
+
+# SECTION 17 — Phase 6 device testing + hardening pass (July 27, 2026)
+
+> **This section is the newest. It WINS over anything above it wherever they conflict.**
+> Everything in Section 16 still applies as background; this section captures what happened
+> the day after Section 16's APK was built, what broke on the real device, and what we fixed
+> before the next rebuild.
+
+## 17.1 Where we are RIGHT NOW
+
+The Phase 6 APK from Section 16 was installed and tested on the real device. Several
+real-device-only bugs surfaced (see 17.4). All of them have been diagnosed and fixed in
+code. A NEW APK build has been kicked off on EAS carrying THREE new fixes:
+
+1. Biometric auto-lock no longer interrupts image, document, or voice attachment flows.
+2. Unsent draft text now survives leaving the app, the biometric lock, and OS-driven memory kills.
+3. Voice recording now has a proper cancel (trash) button — you can bail out of a recording
+   without being forced to send it.
+
+**IMMEDIATE NEXT STEP:** install the new APK when it finishes on EAS and run the test
+checklist in 17.9. If everything passes, we move on to home-screen attachments (17.10).
+
+## 17.2 What Phase 6 actually looked like on the real device
+
+Section 16 marked Phase 6 as "written but not tested." This session was the first real
+device test. Here is what actually happened, in order, so future sessions have the real
+timeline instead of the optimistic one.
+
+**Image upload appeared to 404.** Screenshots showed `Upload failed (404)`. Root cause:
+the Phase 6 backend was committed but NOT yet pushed to Render at the moment of testing.
+The APK was hitting `/attachments` on a server that didn't have that route. Fix was one
+`git push` — Render auto-deployed at 4:22 AM and `curl.exe .../openapi.json | Select-String "attachments"` confirmed the route went live. This is Section 16.11 item 4 catching up
+with reality.
+
+**Voice recording appeared to fail with "Could not start recording."** The recording
+error dialog and the fingerprint prompt were visible in the SAME screenshot — the
+fingerprint prompt was stealing focus at the moment recording tried to start. The user
+noticed the workaround themselves: **turning biometrics OFF made recording work.** That
+observation led straight to the real bug (see 17.4 bug #64).
+
+**Document upload appeared to fail silently.** The AI replied "I didn't receive any
+context about it" for a resume PDF. Root cause was NOT extraction — direct SQL against
+`public.attachments` showed `length(extracted_text) = 3018` for the same PDF, with a
+preview showing the resume text ("Data Analyst — SQL, Python, Power BI ... Hetauda,
+Nepal"). The failure was transaction-visibility on the earliest sends: the first two
+document rows had `message_id = NULL` (never linked to a chat message), while the row
+sent AFTER the backend deploy had `message_id` filled in AND the AI correctly read it
+("I notice it's a resume, specifically Saphin Praja's resume"). The document pipeline
+was working the whole time; the visible failure was a side effect of the pre-deploy 404.
+
+**Voice, image, and document all confirmed WORKING end-to-end on device** once the
+backend was live and biometrics was off. Voice transcript = "Hello, I have something
+to tell you." Image = medical report shown in bubble and correctly described. Document
+= PDF chip shown in bubble and text correctly injected into the AI's context.
+
+## 17.3 Debug logging that was added and then removed
+
+To catch the document injection bug we temporarily added `traceback.print_exc()` and a
+`ATTACHMENT FETCH FAILED:` print inside the `except Exception:` block around
+`attach_repo.get_attachments(...)` in `backend/app/api/chat.py`. It was pushed, ran on
+Render briefly, and then **removed and pushed again** before the rebuild. There is no
+lingering debug output in production. The `except Exception: attachments = []` block is
+back to its original silent form.
+
+**Rule for future sessions:** if you swallow an exception with `attachments = []` or
+similar, ALWAYS add logging when reproducing the bug, and ALWAYS remove it before
+committing the fix. The pattern in this session (add log → push → reproduce → remove log
+→ push) works and should be the default.
+
+## 17.4 New bugs (append to Section 11's numbered list)
+
+**#64 — Biometric auto-lock fires during Android picker / permission dialogs.**
+Symptom: image picker, document picker, and the microphone permission prompt appear to
+"break" — after picking or granting, the fingerprint prompt takes over and the in-flight
+upload/recording never completes. Root cause: `App.tsx` had an `AppState` listener that
+called `setLocked(true)` on ANY background → active transition when biometrics was
+enabled. Android backgrounds the app for a fraction of a second while a system picker or
+permission dialog is up, which triggered the lock.
+
+Fix (in `frontend/App.tsx`):
+
+- Added `const backgroundedAt = useRef<number>(0);` next to the existing
+  `appState` ref.
+- On any transition into inactive/background, stamp `backgroundedAt.current = Date.now()`.
+- On the return to active, compute `awayMs = Date.now() - backgroundedAt.current` and
+  return early if `awayMs < 4000`. Only trips longer than 4 seconds are treated as a
+  real app-switch and trigger the lock.
+- 4 seconds was chosen because pickers return in well under 1 second, while a real
+  human app-switch is essentially always longer.
+
+**#65 — Unsent draft text is wiped when the biometric lock reappears.**
+Symptom: user types a message, switches apps, comes back, unlocks with fingerprint, text
+is gone. Root cause: `ChatScreen` was fully unmounted while `LockScreen` was shown, and
+`ChatInput`'s local `useState('')` for the draft was lost with it.
+
+Chose **Option A (persist the draft to `expo-secure-store`)** over Option B (render lock
+as an overlay with chat still mounted underneath). Reasoning for the record: for a
+privacy-first companion app, "locked" must genuinely tear down the private view. Option B
+leaks: the chat is still in the view tree, timers still running, and Android edge cases
+(screen recording, accessibility services, the app-switcher preview) can expose content
+behind a foreground overlay. Option A is what serious apps (Signal, WhatsApp, banking)
+do — hard teardown of the view, drafts persisted separately in secure storage. It also
+solves the bigger version of the same bug: Android can kill your app's memory at any time
+in the background, and with Option A the draft survives that too, not just the lock.
+
+Fix (in `frontend/src/components/ChatInput.tsx`):
+
+- Added `import * as SecureStore from 'expo-secure-store';`.
+- Added a `draftKey?: string` prop with default `'draft:new'`.
+- `const storeKey = ` + backticks + `saphin.draft.${draftKey}` + backticks + `;` (per-session key).
+- On mount, `useEffect` reads `SecureStore.getItemAsync(storeKey)` and calls `setText(saved)`.
+- On `text` change, a 300ms debounced `useEffect` writes to
+  `SecureStore.setItemAsync(storeKey, text)`.
+- In `handleSend`, after the successful `onSend`, call
+  `SecureStore.deleteItemAsync(storeKey).catch(() => {})` so a sent message doesn't
+  come back as a ghost draft.
+
+Fix (in `frontend/src/screens/ChatScreen.tsx`):
+
+- Passes `draftKey={currentSession ?? 'new'}` into `<ChatInput>`. Each chat keeps its
+  own draft. A brand new chat draft is stored under the `new` key and restored
+  correctly on next mount.
+
+**Why per-session keying matters:** if two chats shared one draft slot, typing in chat
+A then switching to chat B would show A's draft. Per-session avoids that entirely.
+
+**#66 — Voice recording had no cancel; only way out was to send.**
+Symptom: user starts recording, changes their mind, has no button to bail — the only
+option is the send arrow. Root cause: the recording UI in `ChatInput.tsx` rendered
+only the "Recording... tap to send" bar plus a send button.
+
+Fix (in `frontend/src/components/ChatInput.tsx`):
+
+- Added a `cancelRecording` async function next to `stopRecording`. It clears the
+  `autoStop` timer, calls `recorder.stop()` inside try/catch (any error is fine — we
+  are discarding the audio), zeros `startedAt.current`, and calls
+  `setAudioModeAsync({ allowsRecording: false })`. It does NOT upload, does NOT call
+  `onSend`, and does NOT touch state that would emit a bubble.
+- Recording UI now has THREE elements in a row: trash button (left, `trash-outline`
+  icon, tinted `theme.danger`), the recording bar (middle, now also
+  `TouchableOpacity` so tapping the bar itself sends), send button (right).
+- Style change: `styles.recording.marginRight` → `marginHorizontal` so both left and
+  right sides have spacing now that there's a button on each side.
+
+## 17.5 File changes in this session
+
+Backend:
+
+- `backend/app/api/chat.py` — debug logging added, exercised, and REMOVED. Net change
+  from Section 16: none. Do not re-add the debug lines in a permanent commit.
+
+Frontend:
+
+- `frontend/App.tsx` — `backgroundedAt` ref + 4-second grace window on background→active
+  transition (#64).
+- `frontend/src/components/ChatInput.tsx` — SecureStore draft persistence (#65) +
+  cancelRecording function + trash button in recording UI + marginHorizontal style
+  fix (#66).
+- `frontend/src/screens/ChatScreen.tsx` — passes `draftKey={currentSession ?? 'new'}`
+  into `<ChatInput>` (#65).
+
+No new packages installed. `expo-secure-store` was already a dependency (biometrics
+uses it). `expo-doctor` 18/18 and `tsc --noEmit` clean before each commit. Line-ending
+warnings (LF→CRLF) still appear on Windows and are still harmless.
+
+## 17.6 Product decisions made this session
+
+**Home-screen attachments deferred (not cancelled).** The user asked whether voice /
+image / document buttons could live on `ChatsListScreen` (the home page). Decision was
+to skip for this rebuild and revisit as a separate change after the fingerprint fix
+build is verified.
+
+When we do it, the preferred implementation is **Path 2**: home shortcuts open a new
+empty chat and immediately trigger the picker or start recording inside it, reusing
+the existing `ChatInput` component. Do NOT duplicate the upload/record logic into
+`ChatsListScreen` — that is the bug #41 pattern the handover warns against. The
+plumbing already exists in a similar shape (`initialMessage` for text, `autoRecordSignal`
+for hands-free), and the same pattern extends cleanly: a new `initialAction`
+prop on `<ChatScreen>` set to `'record' | 'photo' | 'document'` that fires the
+matching handler on first mount.
+
+Reason for splitting into two builds: if the home change breaks something, the previous
+build is a known-good fallback. Piling both into one 60-90 minute build hides which
+change caused a regression.
+
+**Cancel button chosen over voice-message preview.** The user's original ask was just
+"there is no way to cancel." A more elaborate flow (record → preview → confirm to send)
+was considered and rejected — it fights D30 ("no review transcript before sending —
+speed > perfection"). A trash button is the minimum honest UX without slowing the send
+flow.
+
+## 17.7 The document injection false alarm — for the record
+
+Between "the AI says it doesn't see my PDF" and finding the fix, we ran:
+
+```sql
+select id, kind, original_name, size_bytes,
+       length(extracted_text) as text_len,
+       left(extracted_text, 200) as preview
+from public.attachments
+where kind = 'document'
+order by created_at desc
+limit 5;
+```
+
+Result showed `text_len = 3018` on all three rows with a preview of real resume content.
+Extraction was NEVER broken. A follow-up query with `message_id, session_id, hidden_at`
+showed the newest row had both IDs populated (successful chat-time link) while the
+older two had NULL (uploads that never reached a chat send). The uploads that "failed"
+were the pre-deploy 404 attempts. Once the backend was live, everything worked.
+
+**Lesson for future sessions:** when the AI claims it doesn't see an attachment, the
+first debugging step should be a direct SQL check on `extracted_text` length AND on
+`message_id` linkage BEFORE touching code. It rules out extraction vs injection
+instantly.
+
+## 17.8 Rebuild details
+
+Three fixes are bundled into one EAS build to save an hour of wait:
+
+1. #64 biometric lock during pickers (`App.tsx`).
+2. #65 draft persistence (`ChatInput.tsx`, `ChatScreen.tsx`).
+3. #66 voice cancel button (`ChatInput.tsx`).
+
+Build command was `eas build -p android --profile preview` from `frontend/`, run AFTER
+`npx expo-doctor` (18/18) and `npx tsc --noEmit` (clean). Commit messages were kept
+narrow ("Fix biometric lock interrupting attachment pickers; remove debug logging",
+"Persist unsent draft text across app background/lock (per-session)", "Add cancel
+button for voice recording") so bisecting is easy if a regression appears.
+
+## 17.9 Test checklist for the new APK
+
+Install with biometrics ON and run through these in order. Do NOT skip any — each one
+tests a distinct fix.
+
+1. **Fingerprint login still works.** No regression from the App.tsx change.
+2. **Draft text survives lock.** Open a chat, type "hello world", press home, wait
+   5 seconds, reopen the app, unlock with fingerprint → the text "hello world" is
+   still in the input. Do the same in a SECOND chat with different text and confirm
+   it doesn't leak into the first chat.
+3. **Voice recording works with biometrics ON.** Long-press the mic (or short-press,
+   as configured), record a few seconds, tap send → transcribes and posts. No
+   fingerprint prompt interrupts.
+4. **Voice cancel works.** Start recording, tap the trash icon → no chat bubble
+   appears, no upload happens, no error alert. Just clean stop.
+5. **Image upload works with biometrics ON.** Attach a photo → uploads, shows in
+   bubble, AI describes it. No fingerprint prompt in the middle.
+6. **Document upload works with biometrics ON.** Attach a PDF with real text → AI
+   references the content in its reply.
+7. **Sent messages don't come back as ghost drafts.** Type + send a message. Leave
+   the app. Come back and unlock. Input should be EMPTY, not showing the just-sent
+   message again.
+
+If all 7 pass, the build is good and we move on to home-screen attachments (17.10).
+If any fail, capture a screenshot and the exact steps that reproduce it.
+
+## 17.10 What's next after this build
+
+If 17.9 all passes, tackle home-screen attachments per Path 2 in 17.6:
+
+1. Add an `initialAction?: 'record' | 'photo' | 'document'` prop to `<ChatScreen>`.
+2. In `ChatScreen`, on first mount, if `initialAction` is set, call the matching
+   function on the ChatInput (either via ref, or by threading a `triggerSignal` prop
+   the same way `autoRecordSignal` already works).
+3. Replace or extend the home input in `ChatsListScreen` with mic / attach buttons
+   that call `onStartChatWithAction('record' | 'photo' | 'document')`.
+4. Wire that up in `App.tsx` alongside the existing `onStartChatWithMessage`.
+
+Test it, and only THEN merge Section 17 into a Section 18.
+
+## 17.11 Still outstanding from earlier sections (unchanged)
+
+These carry over from Section 16.11 and remain open:
+
+- 🔴 Rotate the exposed Supabase DB password AND `CRON_SECRET`. Still not done. Every
+  session should nag until this is done.
+- 🟠 Build a development build (`eas build --profile development`) at least once. Would
+  have caught #64, #65, and #66 in minutes instead of costing a full preview build.
+  This is still the highest-leverage change to workflow for future sessions.
+- 🟡 Add FCM key to the `production` EAS profile (Section 16.11 item 5).
+- 🟡 Delete the stale Expo Go row from `push_tokens`.
+- 🟡 Clear test uploads from `attachments` table + storage bucket. This session added
+  at least three more resume test rows (see 17.7); the cleanup query should run against
+  everything before the APK ships publicly.
+- 🟡 Consider per-attachment summary for multi-message document discussion (Section
+  16.11 item 8). Still v1 known limit: attachment text only reaches the AI on the
+  message it arrives with, not on later follow-up questions.
+
+## 17.12 Rules re-affirmed by this session
+
+- **The screenshot timestamp matters.** A screenshot taken BEFORE a fix was deployed
+  proves nothing. Always check the deploy time against the screenshot time before
+  spending an hour debugging code that isn't the problem.
+- **`expo-doctor` and `tsc --noEmit` are 10-second gates. Run them before EVERY build.**
+  This session ran them three separate times. Zero false positives, zero wasted builds.
+- **Direct SQL is the fastest debugger for anything involving Supabase.** For attachment,
+  memory, mood, or reminder bugs, a `select ... from public.<table>` in the Supabase
+  SQL Editor beats reading Render logs.
+- **Debug logging is a tool, not a commit.** Add it, use it, remove it, then commit
+  the real fix. Never leave `print("DEBUG: ...")` in production code.
+- **Don't take the user's phone workaround as the fix.** "It works when I turn
+  biometrics off" is a diagnostic clue, not a shipping plan. The real fix keeps the
+  security feature on and stops it from interfering. #64 was solved this way.
+- **When the user proposes a "one more thing" change during a build sequence, ask
+  whether to bundle it or split it.** This session bundled the voice cancel button
+  because it was tiny and self-contained. It deferred home attachments because they
+  weren't. That judgment call is worth making explicit every time.

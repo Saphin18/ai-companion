@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -35,7 +35,7 @@ import AboutScreen from "./src/screens/AboutScreen";
 
 type View3 =
   | { name: "list" }
-  | { name: "chat"; sessionId: string | null; initialMessage?: string | null }
+  | { name: "chat"; sessionId: string | null; initialMessage?: string | null; initialAction?: "record" | "photo" | "document" | null }
   | { name: "profile" }
   | { name: "journal" }
   | { name: "reminders" }
@@ -247,6 +247,7 @@ function Root() {
       <ChatScreen
         sessionId={view.sessionId}
         initialMessage={view.initialMessage ?? null}
+        initialAction={view.initialAction ?? null}
         onBack={() => setView({ name: "list" })}
       />
     );
@@ -256,6 +257,9 @@ function Root() {
         onOpenChat={(sessionId) => setView({ name: "chat", sessionId })}
         onStartChatWithMessage={(text) =>
           setView({ name: "chat", sessionId: null, initialMessage: text })
+        }
+        onStartChatWithAction={(action) =>
+          setView({ name: "chat", sessionId: null, initialAction: action })
         }
         onOpenProfile={() => setView({ name: "profile" })}
         onOpenJournal={() => setView({ name: "journal" })}
@@ -281,5 +285,3 @@ export default function App() {
     </ThemeProvider>
   );
 }
-
-

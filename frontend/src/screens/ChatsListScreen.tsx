@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import {
   getProfile,
   listSessions,
@@ -32,6 +33,7 @@ import { useTheme } from "../context/ThemeContext";
 type Props = {
   onOpenChat: (sessionId: string | null) => void;
   onStartChatWithMessage: (text: string) => void;
+  onStartChatWithAction: (action: "record" | "photo" | "document") => void;
   onOpenProfile: () => void;
   onOpenJournal: () => void;
   onOpenReminders: () => void;
@@ -52,6 +54,7 @@ function sortSessions(list: SessionSummary[]): SessionSummary[] {
 export default function ChatsListScreen({
   onOpenChat,
   onStartChatWithMessage,
+  onStartChatWithAction,
   onOpenProfile,
   onOpenJournal,
   onOpenReminders,
@@ -229,7 +232,7 @@ export default function ChatsListScreen({
     <View style={{ flex: 1 }}>
       <View style={styles.header}>
         <TouchableOpacity onPress={openDrawer} hitSlop={12}>
-          <Text style={[styles.menuIcon, { color: theme.textPrimary }]}>≡</Text>
+          <Text style={[styles.menuIcon, { color: theme.textPrimary }]}>{"\u2261"}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={onOpenProfile}>
           {avatarUrl ? (
@@ -259,29 +262,50 @@ export default function ChatsListScreen({
           { backgroundColor: theme.surface, borderColor: theme.border },
         ]}
       >
+        <TouchableOpacity
+          onPress={() => {
+            Alert.alert("Attach", "What would you like to send?", [
+              { text: "Photo", onPress: () => onStartChatWithAction("photo") },
+              { text: "Document", onPress: () => onStartChatWithAction("document") },
+              { text: "Cancel", style: "cancel" },
+            ]);
+          }}
+          style={styles.homeIconBtn}
+        >
+          <Ionicons name="add-circle-outline" size={24} color={theme.textSecondary} />
+        </TouchableOpacity>
         <TextInput
           style={[styles.input, { color: theme.textPrimary }]}
           value={draft}
           onChangeText={setDraft}
-          placeholder="Chat with Saphin…"
+          placeholder="Chat with Saphin..."
           placeholderTextColor={theme.textSecondary}
           multiline
           returnKeyType="send"
           onSubmitEditing={sendDraft}
           blurOnSubmit
         />
-        <TouchableOpacity
-          onPress={sendDraft}
-          disabled={!draft.trim()}
-          style={[
-            styles.sendBtn,
-            { backgroundColor: draft.trim() ? theme.accent : theme.border },
-          ]}
-        >
-          <Text style={{ color: theme.accentText, fontSize: 18, fontWeight: "700" }}>
-            ↑
-          </Text>
-        </TouchableOpacity>
+        {draft.trim() ? (
+          <TouchableOpacity
+            onPress={sendDraft}
+            style={[
+              styles.sendBtn,
+              { backgroundColor: theme.accent },
+            ]}
+          >
+            <Ionicons name="arrow-up" size={20} color={theme.accentText} />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={() => onStartChatWithAction("record")}
+            style={[
+              styles.sendBtn,
+              { backgroundColor: theme.surfaceAlt },
+            ]}
+          >
+            <Ionicons name="mic" size={20} color={theme.textSecondary} />
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -324,16 +348,16 @@ export default function ChatsListScreen({
               onPress={() => closeDrawer(() => onOpenChat(null))}
             >
               <Text style={[styles.drawerItemText, { color: theme.accent, fontWeight: "700" }]}>
-                ＋  New chat
+                {"\uFF0B"}  New chat
               </Text>
             </TouchableOpacity>
 
             <View style={[styles.drawerDivider, { backgroundColor: theme.border }]} />
 
-            {drawerItem("📖  Journal", onOpenJournal)}
-            {drawerItem("⏰  Reminders", onOpenReminders)}
-            {drawerItem("🎯  Goals", onOpenGoals)}
-            {drawerItem("ℹ️  About", onOpenAbout)}
+            {drawerItem("\uD83D\uDCD6  Journal", onOpenJournal)}
+            {drawerItem("\u23F0  Reminders", onOpenReminders)}
+            {drawerItem("\uD83C\uDFAF  Goals", onOpenGoals)}
+            {drawerItem("\u2139\uFE0F  About", onOpenAbout)}
 
             <View style={[styles.drawerDivider, { backgroundColor: theme.border }]} />
             <Text style={[styles.recentsLabel, { color: theme.textSecondary }]}>
@@ -359,7 +383,7 @@ export default function ChatsListScreen({
                     onLongPress={() => setMenuFor(item)}
                     delayLongPress={250}
                   >
-                    {item.pinned && <Text style={styles.pin}>📌</Text>}
+                    {item.pinned && <Text style={styles.pin}>{"\uD83D\uDCCC"}</Text>}
                     <Text
                       style={[styles.recentTitle, { color: theme.textPrimary }]}
                       numberOfLines={1}
@@ -400,7 +424,7 @@ export default function ChatsListScreen({
               onPress={() => menuFor && handleTogglePin(menuFor)}
             >
               <Text style={[styles.sheetText, { color: theme.textPrimary }]}>
-                {menuFor?.pinned ? "📌  Unpin" : "📌  Pin"}
+                {menuFor?.pinned ? "\uD83D\uDCCC  Unpin" : "\uD83D\uDCCC  Pin"}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -408,7 +432,7 @@ export default function ChatsListScreen({
               onPress={() => menuFor && openRename(menuFor)}
             >
               <Text style={[styles.sheetText, { color: theme.textPrimary }]}>
-                ✏️  Rename
+                {"\u270F\uFE0F"}  Rename
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -416,7 +440,7 @@ export default function ChatsListScreen({
               onPress={() => menuFor && handleRemove(menuFor)}
             >
               <Text style={[styles.sheetText, { color: theme.danger }]}>
-                🗑  Remove from list
+                {"\uD83D\uDDD1"}  Remove from list
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -521,9 +545,15 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     borderWidth: 1,
     borderRadius: 24,
-    paddingLeft: 18,
+    paddingLeft: 6,
     paddingRight: 6,
     paddingVertical: 6,
+  },
+  homeIconBtn: {
+    width: 38,
+    height: 38,
+    justifyContent: "center",
+    alignItems: "center",
   },
   input: { flex: 1, fontSize: 16, maxHeight: 120, paddingVertical: 8 },
   sendBtn: {
@@ -532,7 +562,7 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 8,
+    marginLeft: 4,
     marginBottom: 2,
   },
 
@@ -591,4 +621,3 @@ const styles = StyleSheet.create({
   },
   renameSaveText: { fontSize: 15, fontWeight: "700" },
 });
-
