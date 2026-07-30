@@ -47,6 +47,7 @@ export default function ChatScreen({ sessionId, onBack, initialMessage, initialA
   handsFreeRef.current = handsFree;
 
   // Home-screen attachment shortcuts: signal ChatInput to open a picker on mount.
+  const [triggerRecordSignal, setTriggerRecordSignal] = useState(0);
   const [triggerPhotoSignal, setTriggerPhotoSignal] = useState(0);
   const [triggerDocSignal, setTriggerDocSignal] = useState(0);
 
@@ -115,7 +116,7 @@ export default function ChatScreen({ sessionId, onBack, initialMessage, initialA
   useEffect(() => {
     if (!firedAction.current && initialAction && !loading && !sending) {
       firedAction.current = true;
-      if (initialAction === "record") setAutoRecordSignal((n) => n + 1);
+      if (initialAction === "record") setTriggerRecordSignal((n) => n + 1);
       else if (initialAction === "photo") setTriggerPhotoSignal((n) => n + 1);
       else if (initialAction === "document") setTriggerDocSignal((n) => n + 1);
     }
@@ -234,6 +235,7 @@ export default function ChatScreen({ sessionId, onBack, initialMessage, initialA
         handsFree={handsFree}
         onToggleHandsFree={toggleHandsFree}
         autoRecordSignal={autoRecordSignal}
+        triggerRecordSignal={triggerRecordSignal}
         draftKey={currentSession ?? 'new'}
         triggerPhotoSignal={triggerPhotoSignal}
         triggerDocSignal={triggerDocSignal}

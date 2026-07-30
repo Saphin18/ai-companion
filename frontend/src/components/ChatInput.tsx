@@ -33,6 +33,8 @@ interface Props {
   onToggleHandsFree?: () => void;
   /** Set from the parent to auto-open the mic after the companion speaks. */
   autoRecordSignal?: number;
+  /** Set from the parent to open the mic once, regardless of hands-free (home-screen shortcut). */
+  triggerRecordSignal?: number;
   /** Unique key so each chat keeps its own unsent draft text. */
   draftKey?: string;
   /** Signal to trigger photo picker from parent (home-screen shortcut). */
@@ -49,6 +51,7 @@ export default function ChatInput({
   handsFree,
   onToggleHandsFree,
   autoRecordSignal,
+  triggerRecordSignal,
   draftKey = 'draft:new',
   triggerPhotoSignal,
   triggerDocSignal,
@@ -167,6 +170,14 @@ export default function ChatInput({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRecordSignal]);
+
+  // Home-screen mic shortcut: open the mic once, regardless of hands-free.
+  useEffect(() => {
+    if (triggerRecordSignal && !recording && !disabled && !busy) {
+      startRecording();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triggerRecordSignal]);
 
   // Parent can trigger photo/document picker (home-screen shortcuts).
   useEffect(() => {
