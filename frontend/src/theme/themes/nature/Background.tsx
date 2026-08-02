@@ -1,19 +1,15 @@
-import React from "react";
-import { StyleSheet, View } from "react-native";
+﻿import React from "react";
+import { Platform, StyleSheet, View } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-
 type Pos = "top" | "center" | "bottom";
-
-// Full-screen photo background (photo + gentle overall dim + darker top/bottom so
-// headers and the input bar stay readable over ANY photo). ThemeContext renders
-// this behind EVERY screen. pointerEvents="none" => it never blocks taps.
-export function makeNatureBackground(wallpaper: number, position: Pos, overlay: string) {
+export function makeNatureBackground(wallpaper: number, position: Pos, overlay: string, webWallpaper?: number) {
   return function NatureBackground(_props: { isDark: boolean }) {
+    const source = Platform.OS === "web" && webWallpaper ? webWallpaper : wallpaper;
     return (
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         <ExpoImage
-          source={wallpaper}
+          source={source}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
           contentPosition={position}

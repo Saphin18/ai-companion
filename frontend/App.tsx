@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -7,9 +7,11 @@ import {
   BackHandler,
   Platform,
   StatusBar,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { Session } from "@supabase/supabase-js";
+import { Ionicons } from "@expo/vector-icons";
 import * as Notifications from "expo-notifications";
 import { supabase } from "./src/services/supabase";
 import { getProfile, updateProfile, registerPushToken } from "./src/services/api";
@@ -33,6 +35,7 @@ import JournalScreen from "./src/screens/JournalScreen";
 import RemindersScreen from "./src/screens/RemindersScreen";
 import GoalsScreen from "./src/screens/GoalsScreen";
 import AboutScreen from "./src/screens/AboutScreen";
+import WebSidebar from "./src/components/WebSidebar";
 
 type View3 =
   | { name: "list" }
@@ -42,6 +45,8 @@ type View3 =
   | { name: "reminders" }
   | { name: "goals" }
   | { name: "about" };
+
+const IS_WEB = Platform.OS === "web";
 
 async function syncProfile(
   session: Session,
@@ -62,6 +67,7 @@ async function syncProfile(
 }
 
 async function syncPushToken() {
+  if (IS_WEB) return;
   try {
     await ensureAndroidChannel();
     const granted = await requestPermission();
@@ -74,6 +80,7 @@ async function syncPushToken() {
 }
 
 async function maybeOfferBiometric() {
+  if (IS_WEB) return;
   try {
     const available = await isBiometricAvailable();
     if (!available) return;
@@ -96,6 +103,9 @@ function Root() {
   const [locked, setLocked] = useState(false);
   const [view, setView] = useState<View3>({ name: "list" });
 
+  const [webSidebarOpen, setWebSidebarOpen] = useState(true);
+  const [webRefreshKey, setWebRefreshKey] = useState(0);
+
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const backgroundedAt = useRef<number>(0);
 
@@ -105,14 +115,16 @@ function Root() {
       if (data.session) {
         syncProfile(data.session, hydrateFromServer);
         syncPushToken();
-        try {
-          const [enabled, available] = await Promise.all([
-            isBiometricEnabled(),
-            isBiometricAvailable(),
-          ]);
-          if (enabled && available) setLocked(true);
-        } catch {
-          // ignore
+        if (!IS_WEB) {
+          try {
+            const [enabled, available] = await Promise.all([
+              isBiometricEnabled(),
+              isBiometricAvailable(),
+            ]);
+            if (enabled && available) setLocked(true);
+          } catch {
+            // ignore
+          }
         }
       }
       setReady(true);
@@ -132,6 +144,7 @@ function Root() {
   }, []);
 
   useEffect(() => {
+    if (IS_WEB) return;
     const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
       const type = resp.notification.request.content.data?.type;
       if (type === "checkin") {
@@ -142,6 +155,7 @@ function Root() {
   }, []);
 
   useEffect(() => {
+    if (IS_WEB) return;
     const sub = AppState.addEventListener("change", async (next) => {
       const prev = appState.current;
       appState.current = next;
@@ -149,11 +163,8 @@ function Root() {
         backgroundedAt.current = Date.now();
       }
       if (prev.match(/inactive|background/) && next === "active") {
-        // Ignore brief trips: image/document pickers and the mic permission
-        // dialog momentarily background the app. A real app-switch is longer.
         const awayMs = Date.now() - backgroundedAt.current;
         if (awayMs < 4000) return;
-        // A picker or crop screen is still open — don't interrupt it.
         if (pickerLock.active) return;
         if (session) {
           try {
@@ -172,6 +183,7 @@ function Root() {
   }, [session]);
 
   useEffect(() => {
+    if (IS_WEB) return;
     const onBackPress = () => {
       if (
         view.name === "chat" ||
@@ -189,6 +201,12 @@ function Root() {
     const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
     return () => sub.remove();
   }, [view]);
+
+  useEffect(() => {
+    if (IS_WEB && view.name === "list") {
+      setWebRefreshKey((k) => k + 1);
+    }
+  }, [view.name]);
 
   const bar = (
     <StatusBar barStyle={theme.isDark ? "light-content" : "dark-content"} />
@@ -211,6 +229,18 @@ function Root() {
   }
 
   if (!session) {
+    if (IS_WEB) {
+      return (
+        <>
+          {bar}
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: theme.background }}>
+            <View style={{ width: "100%", maxWidth: 440, paddingHorizontal: 20 }}>
+              <AuthScreen />
+            </View>
+          </View>
+        </>
+      );
+    }
     return (
       <>
         {bar}
@@ -273,6 +303,51 @@ function Root() {
     );
   }
 
+  if (IS_WEB) {
+    return (
+      <>
+        {bar}
+        <View style={{ flexDirection: "row", flex: 1, backgroundColor: theme.background }}>
+          {webSidebarOpen && (
+            <WebSidebar
+              onOpenChat={(id) => {
+                setView(id ? { name: "chat", sessionId: id } : { name: "list" });
+                setWebRefreshKey((k) => k + 1);
+              }}
+              onOpenProfile={() => setView({ name: "profile" })}
+              onOpenJournal={() => setView({ name: "journal" })}
+              onOpenReminders={() => setView({ name: "reminders" })}
+              onOpenGoals={() => setView({ name: "goals" })}
+              onOpenAbout={() => setView({ name: "about" })}
+              onCollapse={() => setWebSidebarOpen(false)}
+              activeView={view.name}
+              refreshKey={webRefreshKey}
+            />
+          )}
+          <View style={{ flex: 1 }}>
+            {!webSidebarOpen && (
+              <TouchableOpacity
+                onPress={() => setWebSidebarOpen(true)}
+                style={{
+                  position: "absolute",
+                  top: 16,
+                  left: 16,
+                  zIndex: 10,
+                  padding: 8,
+                }}
+              >
+                <Ionicons name="menu" size={22} color={theme.textSecondary} />
+              </TouchableOpacity>
+            )}
+            <View style={{ flex: 1, maxWidth: 720, width: "100%", alignSelf: "center" }}>
+              {content}
+            </View>
+          </View>
+        </View>
+      </>
+    );
+  }
+
   return (
     <>
       {bar}
@@ -288,3 +363,5 @@ export default function App() {
     </ThemeProvider>
   );
 }
+
+

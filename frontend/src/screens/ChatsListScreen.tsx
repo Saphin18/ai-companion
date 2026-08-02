@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -231,9 +231,9 @@ export default function ChatsListScreen({
   const homeBody = (
     <View style={{ flex: 1 }}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={openDrawer} hitSlop={12}>
+        {Platform.OS !== "web" ? (<TouchableOpacity onPress={openDrawer} hitSlop={12}>
           <Text style={[styles.menuIcon, { color: theme.textPrimary }]}>{"\u2261"}</Text>
-        </TouchableOpacity>
+        </TouchableOpacity>) : (<View />)}
         <TouchableOpacity onPress={onOpenProfile}>
           {avatarUrl ? (
             <Image source={{ uri: avatarUrl }} style={styles.headerAvatarImg} />
@@ -321,7 +321,7 @@ export default function ChatsListScreen({
       )}
 
       {/* ===== Drawer ===== */}
-      {drawerOpen && (
+      {Platform.OS !== "web" && drawerOpen && (
         <View style={StyleSheet.absoluteFill}>
           <Animated.View
             style={[styles.backdrop, { opacity: fade }]}
@@ -621,3 +621,5 @@ const styles = StyleSheet.create({
   },
   renameSaveText: { fontSize: 15, fontWeight: "700" },
 });
+
+
