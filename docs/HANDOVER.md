@@ -2338,3 +2338,292 @@ These carry over from Section 16.11 and remain open:
   whether to bundle it or split it.** This session bundled the voice cancel button
   because it was tiny and self-contained. It deferred home attachments because they
   weren't. That judgment call is worth making explicit every time.
+
+
+# 18. Session update — UTF-8 encoding fix, home-screen attachments (17.10 done), and two new picker bugs found on device
+
+## 18.1 Starting point
+
+Picked up right after Section 17. The 17.9 test checklist (biometric, draft
+persistence, voice cancel) had already passed on-device by the start of this
+session — confirmed verbally by the user, not re-verified in this session. That
+APK was NOT yet installed when this session's changes were made; all fixes below
+were bundled into ONE new build rather than shipped separately, by user's choice.
+
+## 18.2 UTF-8 encoding corruption found and fixed (mistake #44, recurrence)
+
+A screenshot showed the chat header rendering `â€¹ Chats` instead of `‹ Chats` —
+the exact corruption signature documented in Section 11 mistake #44. Root cause
+was unchanged from the original mistake: `‹`, `…`, and `—` characters had been
+written to `ChatScreen.tsx` at some earlier point without proper UTF-8 handling.
+
+Scan of the whole frontend (`Select-String -Pattern "â€|ðŸ|Ã©|Â "`) found the
+corruption confined to three lines in one file:
+
+- `frontend/src/screens/ChatScreen.tsx` line ~189 — back button label
+  (`â€¹ Chats` → `‹ Chats`)
+- same file line ~210 — "Thinking" indicator (`Thinkingâ€¦` → `Thinking…`)
+- same file line ~225 — a code comment (`wrapper â€” the OS` → `wrapper — the OS`)
+
+Fix method: rather than pasting the correct characters into PowerShell (which
+risks the same corruption happening again on write), used
+`.Replace([char]0x00E2 + [char]0x20AC + [char]0x00B9, [string][char]0x2039)`
+style code-point-built replacements for all three. First attempt used the wrong
+code point for the em dash (`0x201C` instead of `0x201D` — Windows-1252 byte
+`0x94` is the right double quote, not the left one) and needed one follow-up
+correction. Final verification: `Select-String -Pattern "â€|ðŸ|Ã©|Â "` across
+the whole frontend returns only two unrelated hits inside
+`node_modules/@types/node`.
+
+**Rule reaffirmed:** when fixing this class of bug, verify the fix with a
+literal search on the corrupted BYTES (`â€¹`, `â€¦`, `â€"`, `â€"`), not by eye —
+Windows-1252 mis-decoding produces several different sequences depending on
+which Unicode character was mangled, and it is easy to fix one and miss
+another in the same file.
+
+## 18.3 Home-screen attachments — 17.10 implemented
+
+Per the Path 2 plan already agreed in Section 17.6, added the ability to start
+a chat directly from a voice/photo/document shortcut on the home screen,
+reusing `ChatInput`'s existing picker/recorder logic (no duplication — avoids
+the bug #41 pattern).
+
+**New prop chain**, mirroring how `initialMessage` already worked:
+
+- `App.tsx` — `View3`'s `"chat"` variant gained `initialAction?: "record" |
+  "photo" | "document" | null`. Added `onStartChatWithAction` prop passed into
+  `ChatsListScreen`, which sets `view` to `{ name: "chat", sessionId: null,
+  initialAction: action }`.
+- `ChatScreen.tsx` — new `initialAction` prop. On first mount (guarded by a
+  `firedAction` ref so it only fires once), maps the action to one of three
+  new signal states: `triggerPhotoSignal`, `triggerDocSignal`, and (originally)
+  `autoRecordSignal` for `"record"` — this last part had a bug, see 18.4.
+- `ChatInput.tsx` — new `triggerPhotoSignal?: number` and `triggerDocSignal?:
+  number` props. Two new `useEffect`s call the existing `pickImage()` /
+  `pickDocument()` functions when their signal increments.
+- `ChatsListScreen.tsx` — home input bar redesigned: `Ionicons` import added.
+  Left side gained a `(+)` attach button that opens an `Alert.alert` with
+  Photo / Document / Cancel, calling `onStartChatWithAction("photo" |
+  "document")`. Right side: when there's typed text, shows an up-arrow send
+  button same as before; when empty, shows a mic icon that calls
+  `onStartChatWithAction("record")`. All emoji in this file were also switched
+  to `\uXXXX` escapes as a defensive measure against #44 recurring.
+
+`npx tsc --noEmit` and `npx expo-doctor` (18/18) both clean after this change,
+verified BEFORE the picker-lock work in 18.4 was layered on top.
+
+## 18.4 New bugs found on device (append to Section 11's numbered list)
+
+**#67 — Biometric lock still interrupts the photo crop screen, even with the
+#64 fix.** User reported: tapping "change photo" in Profile, picking a photo
+from the gallery, then spending time on Samsung's built-in crop screen would
+trigger the fingerprint prompt mid-crop. Root cause: the #64 fix (Section
+17.4) uses a fixed 4-second grace window on any background→active transition.
+Cropping routinely takes longer than 4 seconds, so the app treats it as a real
+app-switch and locks.
+
+Fix: added a new shared module `frontend/src/services/pickerLock.ts`:
+
+```typescript
+/** Shared flag: set true while a picker is open so App.tsx skips the biometric lock. */
+export const pickerLock = { active: false };
+```
+
+- `App.tsx` — imports `pickerLock`; inside the existing `AppState` listener,
+  added `if (pickerLock.active) return;` immediately after the existing
+  4-second `awayMs` check. The 4-second window is UNCHANGED and still the
+  first line of defense; `pickerLock` is a second, more precise guard for
+  operations that can legitimately run longer.
+- `ChatInput.tsx` — `pickImage()` and `pickDocument()` now set
+  `pickerLock.active = true` immediately before calling the native picker and
+  set it back to `false` right after the picker call returns (or in the catch
+  block, so a thrown error never leaves the lock stuck on).
+- `ProfileScreen.tsx` — `takePhoto()` and `pickFromGallery()` wrap the native
+  camera/gallery call (which includes the crop step, since both use
+  `allowsEditing: true`) in `pickerLock.active = true` / `try { ... } finally
+  { pickerLock.active = false }`. The `finally` guarantees the lock always
+  clears even if the picker throws or the user backs out.
+
+User explicitly wanted to KEEP the crop step (not remove `allowsEditing`) —
+confirmed before implementing. Nothing about the crop UI itself changed; only
+the lock-timing logic around it.
+
+**#68 — Home-screen mic shortcut opened the chat but never started
+recording.** Symptom, confirmed by screenshots: tapping the home-screen mic
+navigated into a new chat, but the mic never engaged — user had to tap the
+in-chat mic button manually. Root cause: the `initialAction === "record"`
+branch in `ChatScreen.tsx` (see 18.3) was reusing `autoRecordSignal`, the same
+signal used for hands-free auto-reopen. But `ChatInput.tsx`'s effect for that
+signal is gated: `if (autoRecordSignal && handsFree && !recording && ...)`.
+Since the home-screen shortcut is not hands-free, `handsFree` is `false` and
+the effect silently no-ops.
+
+Fix: introduced a second, independent signal not gated by `handsFree`.
+
+- `ChatInput.tsx` — new `triggerRecordSignal?: number` prop with its own
+  `useEffect`: `if (triggerRecordSignal && !recording && !disabled && !busy)
+  { startRecording(); }` — no `handsFree` check.
+- `ChatScreen.tsx` — new `triggerRecordSignal` state, separate from the
+  existing `autoRecordSignal`. The `initialAction === "record"` branch now
+  calls `setTriggerRecordSignal((n) => n + 1)` instead of touching
+  `autoRecordSignal`. `autoRecordSignal` and its hands-free behavior are
+  completely untouched.
+
+**Why this matters for future sessions:** `autoRecordSignal` and
+`triggerRecordSignal` look similar and both ultimately call `startRecording()`,
+but they answer different questions — "should the mic reopen automatically
+after the companion finishes speaking" vs "should the mic open once right
+now regardless of mode." Do not collapse them back into one signal; the
+gating on `handsFree` is intentional and load-bearing for hands-free mode.
+
+## 18.5 File changes in this session
+
+Frontend only, no backend changes this session:
+
+- `frontend/src/screens/ChatScreen.tsx` — encoding fix (18.2); `initialAction`
+  prop, `triggerPhotoSignal`/`triggerDocSignal`/`triggerRecordSignal` states
+  and wiring (18.3, 18.4).
+- `frontend/src/components/ChatInput.tsx` — `triggerPhotoSignal`,
+  `triggerDocSignal` props + effects (18.3); `pickerLock` import and
+  set/clear around `pickImage`/`pickDocument` (18.4 #67);
+  `triggerRecordSignal` prop + unconditional effect (18.4 #68).
+- `frontend/src/screens/ChatsListScreen.tsx` — home input bar redesign with
+  attach/mic buttons, `onStartChatWithAction` prop, `Ionicons` import,
+  emoji switched to `\uXXXX` escapes (18.3).
+- `frontend/App.tsx` — `initialAction` threaded through `View3` and into
+  `<ChatScreen>`; `onStartChatWithAction` passed into `<ChatsListScreen>`
+  (18.3); `pickerLock` import and check in the `AppState` listener (18.4 #67).
+- `frontend/src/screens/ProfileScreen.tsx` — `pickerLock` import and
+  set/clear (in `try/finally`) around `takePhoto`/`pickFromGallery` (18.4
+  #67); emoji switched to `\uXXXX` escapes as a defensive measure.
+- `frontend/src/services/pickerLock.ts` — NEW file, 2 lines, shared flag
+  module (18.4 #67).
+
+No new packages installed. `npx tsc --noEmit` and `npx expo-doctor` (18/18)
+were run and confirmed clean after EVERY file change in this session, not
+just once at the end — this caught nothing broken, but the habit from 17.12
+held.
+
+## 18.6 Commits this session
+
+Two separate commits, both pushed to `main`:
+
+1. `"Home-screen attach/mic buttons, fix UTF-8 encoding in ChatScreen"` —
+   covers 18.2 and the first pass of 18.3 (before the #67/#68 bugs were
+   found).
+2. `"Add pickerLock to prevent chat input during media picker"` — covers the
+   #67 fix. (Message is slightly imprecise — it's about the biometric lock
+   during the picker/crop screen, not "chat input"; worth a clearer message
+   next time.)
+3. `"Fix home-screen mic shortcut: separate triggerRecordSignal from
+   hands-free autoRecordSignal"` — covers the #68 fix.
+
+One `git push` was rejected (`! [rejected] main -> main (fetch first)`)
+because the remote had a commit not present locally. Resolved with `git pull
+origin main`, which opened a merge commit message in VS Code
+(`MERGE_MSG`) — the default merge message was accepted as-is and the merge
+completed cleanly with no conflicts.
+
+## 18.7 Workflow snag worth remembering: stale files in Downloads
+
+When re-downloading an updated version of a file with the same name Chrome/
+Windows saves it as `App (1).tsx` instead of overwriting, so a `Copy-Item`
+using the plain filename silently copies the STALE original instead of the
+new one. This caused `App.tsx` and `ChatInput.tsx` to appear to have "no
+changes" in `git status` after a copy step, even though new versions had been
+generated and presented. Symptom: `git status --short` showed fewer modified
+files than files that were actually changed.
+
+**Fix used:** delete everything in the Downloads folder, then re-download the
+files fresh so there's only one copy of each, then re-run the `Copy-Item`
+commands.
+
+**Rule for future sessions:** before any `Copy-Item` from `$env:USERPROFILE\
+Downloads\`, either (a) tell the user to clear Downloads of same-named files
+first, or (b) use `Get-ChildItem "$env:USERPROFILE\Downloads\<name>*"` to
+confirm there is exactly one match before copying. This is now the second
+time a Downloads-folder mismatch has caused confusion in this project; it's
+worth checking every time files are handed off this way.
+
+## 18.8 Rebuild details
+
+Build command `eas build -p android --profile preview` was kicked off from
+`frontend/` after the final `triggerRecordSignal` fix (18.4 #68), bundling
+ALL of this session's changes into one APK:
+
+1. UTF-8 encoding fix (18.2).
+2. Home-screen attach/mic buttons — 17.10 (18.3).
+3. `pickerLock` fix for biometric-during-crop — #67 (18.4).
+4. `triggerRecordSignal` fix for home-screen mic not starting — #68 (18.4).
+
+`npx tsc --noEmit` and `npx expo-doctor` (18/18) both clean immediately before
+the build was triggered. Build result (APK link / install / on-device test)
+was NOT YET confirmed at the point this section was written — that's the
+immediate next step for whoever picks this up.
+
+## 18.9 Test checklist for the new APK
+
+Once the build finishes and is installed, in ADDITION to re-confirming 17.9
+still holds (nothing in this session should have touched those code paths,
+but the pickerLock change does touch the same `AppState` listener, so a full
+re-check is warranted):
+
+1. **Header renders `‹ Chats` correctly**, not `â€¹ Chats`.
+2. **Home-screen mic button** — tap it from the home screen (not inside a
+   chat) → should open a new chat AND immediately start recording, no second
+   tap needed.
+3. **Home-screen photo button** — tap `(+)` on home screen → Photo → gallery
+   opens immediately in a new chat.
+4. **Home-screen document button** — same, for Document.
+5. **Profile photo crop, biometrics ON** — Profile → tap avatar → gallery →
+   pick a photo → spend 10+ seconds on the Samsung crop screen → tap CROP →
+   should return to Profile with the new avatar, NO fingerprint prompt
+   appearing during or after the crop.
+6. **Profile photo — take a photo (camera), same test** as #5 but via the
+   camera instead of gallery.
+7. **Hands-free mode still works** — long-press the mic inside an existing
+   chat to turn on hands-free, confirm the companion still auto-reopens the
+   mic after speaking (this is `autoRecordSignal`, untouched, but worth
+   confirming nothing regressed).
+
+If all 7 pass, this build is done and Section 18 can be considered closed —
+merge into a future Section 19 for the next round of work.
+
+## 18.10 Still outstanding from earlier sections (unchanged)
+
+Carried over from Section 17.11, still open, still nagging every session
+until resolved:
+
+- 🔴 Rotate the exposed Supabase DB password AND `CRON_SECRET`. STILL not
+  done across at least two sessions now.
+- 🟠 Build a development build (`eas build --profile development`) at least
+  once. Would have caught #67 and #68 in minutes via live reload instead of
+  costing a full preview build cycle each time. This is still the
+  highest-leverage unaddressed workflow change.
+- 🟡 Add FCM key to the `production` EAS profile.
+- 🟡 Delete the stale Expo Go row from `push_tokens`.
+- 🟡 Clear test uploads from `attachments` table + storage bucket.
+- 🟡 Consider per-attachment summary for multi-message document discussion.
+  Still v1 known limit.
+
+## 18.11 Rules re-affirmed by this session
+
+- **Mistake #44 (UTF-8 corruption) can recur in files that were previously
+  clean if new code is typed/pasted carelessly.** Don't assume a file fixed
+  once stays fixed — re-scan with the byte-pattern search after any manual
+  edit to a file that touches special characters.
+- **Two signals that both "start recording" are not interchangeable if one
+  is gated and the other isn't.** Read the actual condition inside the
+  `useEffect`, not just the function it calls, before reusing an existing
+  signal for a new purpose.
+- **A `try/finally` around a lock flag is mandatory, not optional.** Both
+  `pickerLock` implementations (ChatInput and ProfileScreen) use
+  `finally`/try-catch specifically so a thrown picker error can never leave
+  the app permanently unable to lock.
+- **When re-downloading a file with the same name as a previous download,
+  clear Downloads first or verify there's only one match.** Stale duplicate
+  downloads silently defeated two `Copy-Item` commands in this session.
+- **Bundling multiple small, related fixes into one build is fine when each
+  fix is small and independently verified with `tsc`/`expo-doctor` before
+  moving to the next one** — this session bundled four separate fixes into a
+  single EAS build after verifying each in isolation.

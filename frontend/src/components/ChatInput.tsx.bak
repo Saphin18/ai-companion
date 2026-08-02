@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -28,16 +28,22 @@ import type { Attachment } from '../types/chat';
 interface Props {
   onSend: (text: string, attachments: Attachment[]) => void;
   disabled?: boolean;
+  /** True while hands-free mode is on, so the mic can show it. */
   handsFree?: boolean;
   onToggleHandsFree?: () => void;
+  /** Set from the parent to auto-open the mic after the companion speaks. */
   autoRecordSignal?: number;
+  /** Set from the parent to open the mic once, regardless of hands-free (home-screen shortcut). */
   triggerRecordSignal?: number;
+  /** Unique key so each chat keeps its own unsent draft text. */
   draftKey?: string;
+  /** Signal to trigger photo picker from parent (home-screen shortcut). */
   triggerPhotoSignal?: number;
+  /** Signal to trigger document picker from parent (home-screen shortcut). */
   triggerDocSignal?: number;
 }
 
-const MAX_RECORD_MS = 120000;
+const MAX_RECORD_MS = 120000; // 2 minutes is plenty for a voice note
 
 export default function ChatInput({
   onSend,
@@ -53,8 +59,12 @@ export default function ChatInput({
   const { theme } = useTheme();
   const [text, setText] = useState('');
 
+  // --- draft persistence ---------------------------------------------------
+  // Unsent text survives leaving the app (biometric lock, memory kill, calls).
+  // Stored in secure storage, keyed per chat so drafts never cross over.
   const storeKey = `saphin.draft.${draftKey}`;
 
+  // Restore whatever was left unsent when this input mounts.
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -71,6 +81,7 @@ export default function ChatInput({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeKey]);
 
+  // Save the draft as it changes, debounced so we are not hammering storage.
   useEffect(() => {
     const t = setTimeout(() => {
       SecureStore.setItemAsync(storeKey, text).catch(() => {});
@@ -85,6 +96,8 @@ export default function ChatInput({
   const recording = recorderState?.isRecording ?? false;
   const startedAt = useRef<number>(0);
   const autoStop = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // --- recording -----------------------------------------------------------
 
   const startRecording = async () => {
     try {
@@ -115,7 +128,7 @@ export default function ChatInput({
     try {
       await recorder.stop();
       const uri = recorder.uri;
-      if (!uri || durationMs < 600) return;
+      if (!uri || durationMs < 600) return; // ignore accidental taps
 
       setBusy('Transcribing...');
       const att = await uploadAttachment(
@@ -125,6 +138,7 @@ export default function ChatInput({
         'audio/m4a',
         durationMs
       );
+      // The transcript becomes the message text; the audio rides along.
       onSend(att.extracted_text ?? '', [att]);
     } catch (e: any) {
       Alert.alert('Voice message failed', e?.message ?? 'Please try again.');
@@ -158,19 +172,14 @@ export default function ChatInput({
   }, [autoRecordSignal]);
 
   // Home-screen mic shortcut: open the mic once, regardless of hands-free.
-  // A short delay lets the native audio recorder (useAudioRecorder) finish
-  // initializing after mount. Without it, startRecording() fires before the
-  // recorder is ready and silently does nothing.
   useEffect(() => {
     if (triggerRecordSignal && !recording && !disabled && !busy) {
-      const t = setTimeout(() => {
-        startRecording();
-      }, 500);
-      return () => clearTimeout(t);
+      startRecording();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [triggerRecordSignal]);
 
+  // Parent can trigger photo/document picker (home-screen shortcuts).
   useEffect(() => {
     if (triggerPhotoSignal && !recording && !disabled && !busy) {
       pickImage();
@@ -190,6 +199,8 @@ export default function ChatInput({
       if (autoStop.current) clearTimeout(autoStop.current);
     };
   }, []);
+
+  // --- attachments ---------------------------------------------------------
 
   const pickImage = async () => {
     try {
@@ -258,6 +269,8 @@ export default function ChatInput({
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
+
+  // --- send ----------------------------------------------------------------
 
   const handleSend = () => {
     const trimmed = text.trim();
