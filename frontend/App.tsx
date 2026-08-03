@@ -8,10 +8,12 @@ import {
   Platform,
   StatusBar,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { Session } from "@supabase/supabase-js";
 import { Ionicons } from "@expo/vector-icons";
+import * as Font from "expo-font";
 import * as Notifications from "expo-notifications";
 import { supabase } from "./src/services/supabase";
 import { getProfile, updateProfile, registerPushToken } from "./src/services/api";
@@ -47,6 +49,13 @@ type View3 =
   | { name: "about" };
 
 const IS_WEB = Platform.OS === "web";
+
+// Load Ionicons font for web (fixes empty-square icons on Vercel deploy)
+if (IS_WEB && typeof document !== "undefined") {
+  const style = document.createElement("style");
+  style.textContent = "@font-face { font-family: 'Ionicons'; src: url('/fonts/Ionicons.ttf') format('truetype'); }";
+  document.head.appendChild(style);
+}
 
 async function syncProfile(
   session: Session,
@@ -105,9 +114,20 @@ function Root() {
 
   const [webSidebarOpen, setWebSidebarOpen] = useState(true);
   const [webRefreshKey, setWebRefreshKey] = useState(0);
+  const [fontsReady, setFontsReady] = useState(false);
+
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktopWeb = IS_WEB && windowWidth >= 768;
 
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const backgroundedAt = useRef<number>(0);
+
+  // --- Load Ionicons font for web (fixes empty-square icons on Vercel) ---
+  useEffect(() => {
+    Font.loadAsync(Ionicons.font)
+      .then(() => setFontsReady(true))
+      .catch(() => setFontsReady(true));
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -212,7 +232,7 @@ function Root() {
     <StatusBar barStyle={theme.isDark ? "light-content" : "dark-content"} />
   );
 
-  if (!ready) {
+  if (!ready || !fontsReady) {
     return (
       <View
         style={{
@@ -229,7 +249,7 @@ function Root() {
   }
 
   if (!session) {
-    if (IS_WEB) {
+    if (isDesktopWeb) {
       return (
         <>
           {bar}
@@ -303,7 +323,7 @@ function Root() {
     );
   }
 
-  if (IS_WEB) {
+  if (isDesktopWeb) {
     return (
       <>
         {bar}
@@ -363,5 +383,6 @@ export default function App() {
     </ThemeProvider>
   );
 }
+
 
 

@@ -25,6 +25,15 @@ import {
 } from "../services/biometrics";
 
 // Where Supabase sends the recovery email link (backend-hosted reset page).
+// Cross-platform alert: window.alert on web, native Alert elsewhere
+function showAlert(title: string, message: string) {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    window.alert(title + "\n\n" + message);
+  } else {
+    showAlert(title, message);
+  }
+}
+
 const RESET_REDIRECT_URL =
   "https://saphin-ai-backend.onrender.com/reset-password";
 
@@ -102,7 +111,7 @@ export default function AuthScreen() {
 
   const handleForgotPassword = async () => {
     if (!email.trim()) {
-      Alert.alert(
+      showAlert(
         "Enter your email",
         "Type your account email in the Email field above, then tap “Forgot password?” again."
       );
@@ -114,12 +123,12 @@ export default function AuthScreen() {
         redirectTo: RESET_REDIRECT_URL,
       });
       if (error) throw error;
-      Alert.alert(
+      showAlert(
         "Check your email",
         "If an account exists for that email, we sent a link to reset your password."
       );
     } catch (e: any) {
-      Alert.alert("Error", e.message ?? "Something went wrong.");
+      showAlert("Error", e.message ?? "Something went wrong.");
     } finally {
       setLoading(false);
     }
@@ -128,7 +137,7 @@ export default function AuthScreen() {
   const handleBiometricLogin = async () => {
     const creds = await getStoredCredentials();
     if (!creds) {
-      Alert.alert("Not set up", "Please log in with your password first.");
+      showAlert("Not set up", "Please log in with your password first.");
       setCanUseBiometric(false);
       return;
     }
@@ -142,14 +151,14 @@ export default function AuthScreen() {
       });
       if (error) {
         // Stored password no longer valid (e.g. changed elsewhere).
-        Alert.alert(
+        showAlert(
           "Please log in again",
           "Your saved login is out of date. Enter your password to continue."
         );
         setCanUseBiometric(false);
       }
     } catch (e: any) {
-      Alert.alert("Error", e.message ?? "Something went wrong.");
+      showAlert("Error", e.message ?? "Something went wrong.");
     } finally {
       setLoading(false);
     }
@@ -157,19 +166,19 @@ export default function AuthScreen() {
 
   const handleSubmit = async () => {
     if (!email.trim() || !password) {
-      Alert.alert("Missing info", "Please enter your email and password.");
+      showAlert("Missing info", "Please enter your email and password.");
       return;
     }
     if (isSignUp && !fullName.trim()) {
-      Alert.alert("Missing info", "Please enter your full name.");
+      showAlert("Missing info", "Please enter your full name.");
       return;
     }
     if (isSignUp && password.length < 6) {
-      Alert.alert("Weak password", "Password must be at least 6 characters.");
+      showAlert("Weak password", "Password must be at least 6 characters.");
       return;
     }
     if (isSignUp && password !== confirmPassword) {
-      Alert.alert(
+      showAlert(
         "Passwords don't match",
         "Please make sure both passwords are the same."
       );
@@ -185,7 +194,7 @@ export default function AuthScreen() {
         });
         if (error) throw error;
         if (data.user && data.user.identities && data.user.identities.length === 0) {
-          Alert.alert(
+          showAlert(
             "Email already registered",
             "This email is already in use. Please log in instead."
           );
@@ -198,7 +207,7 @@ export default function AuthScreen() {
         } catch {
           // No session yet if email confirmation is on; name re-saves on first login.
         }
-        Alert.alert(
+        showAlert(
           "Check your email",
           "We sent you a confirmation link. Confirm, then log in."
         );
@@ -221,7 +230,7 @@ export default function AuthScreen() {
         }
       }
     } catch (e: any) {
-      Alert.alert("Error", e.message ?? "Something went wrong.");
+      showAlert("Error", e.message ?? "Something went wrong.");
     } finally {
       setLoading(false);
     }
@@ -497,3 +506,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+

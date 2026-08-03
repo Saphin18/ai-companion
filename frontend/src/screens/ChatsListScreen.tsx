@@ -16,6 +16,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -62,6 +63,9 @@ export default function ChatsListScreen({
   onOpenAbout,
 }: Props) {
   const { theme } = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === "web" && windowWidth >= 768;
+
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -231,7 +235,7 @@ export default function ChatsListScreen({
   const homeBody = (
     <View style={{ flex: 1 }}>
       <View style={styles.header}>
-        {Platform.OS !== "web" ? (<TouchableOpacity onPress={openDrawer} hitSlop={12}>
+        {!isDesktopWeb ? (<TouchableOpacity onPress={openDrawer} hitSlop={12}>
           <Text style={[styles.menuIcon, { color: theme.textPrimary }]}>{"\u2261"}</Text>
         </TouchableOpacity>) : (<View />)}
         <TouchableOpacity onPress={onOpenProfile}>
@@ -264,11 +268,16 @@ export default function ChatsListScreen({
       >
         <TouchableOpacity
           onPress={() => {
-            Alert.alert("Attach", "What would you like to send?", [
-              { text: "Photo", onPress: () => onStartChatWithAction("photo") },
-              { text: "Document", onPress: () => onStartChatWithAction("document") },
-              { text: "Cancel", style: "cancel" },
-            ]);
+            if (Platform.OS === "web" && typeof window !== "undefined") {
+              const photo = window.confirm("Attach a photo?\n\nOK = Photo\nCancel = Document");
+              onStartChatWithAction(photo ? "photo" : "document");
+            } else {
+              Alert.alert("Attach", "What would you like to send?", [
+                { text: "Photo", onPress: () => onStartChatWithAction("photo") },
+                { text: "Document", onPress: () => onStartChatWithAction("document") },
+                { text: "Cancel", style: "cancel" },
+              ]);
+            }
           }}
           style={styles.homeIconBtn}
         >
@@ -321,7 +330,7 @@ export default function ChatsListScreen({
       )}
 
       {/* ===== Drawer ===== */}
-      {Platform.OS !== "web" && drawerOpen && (
+      {!isDesktopWeb && drawerOpen && (
         <View style={StyleSheet.absoluteFill}>
           <Animated.View
             style={[styles.backdrop, { opacity: fade }]}
@@ -621,5 +630,4 @@ const styles = StyleSheet.create({
   },
   renameSaveText: { fontSize: 15, fontWeight: "700" },
 });
-
 

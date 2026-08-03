@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -23,7 +23,42 @@ import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../context/ThemeContext';
 import { pickerLock } from '../services/pickerLock';
 import { uploadAttachment } from '../services/attachments';
-import type { Attachment } from '../types/chat';
+import type { Attachment, AttachmentKind } from '../types/chat';
+
+// --- Web-safe helpers (native paths unchanged) ---
+
+function showAlert(title: string, message: string) {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    window.alert(title + '\n\n' + message);
+  } else {
+    Alert.alert(title, message);
+  }
+}
+
+async function secureGet(key: string): Promise<string | null> {
+  if (Platform.OS === 'web') {
+    try { return localStorage.getItem(key); } catch { return null; }
+  }
+  return SecureStore.getItemAsync(key);
+}
+
+async function secureSet(key: string, value: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    try { localStorage.setItem(key, value); } catch {}
+    return;
+  }
+  return SecureStore.setItemAsync(key, value);
+}
+
+async function secureDelete(key: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    try { localStorage.removeItem(key); } catch {}
+    return;
+  }
+  return SecureStore.deleteItemAsync(key);
+}
+
+// --- End web-safe helpers ---
 
 interface Props {
   onSend: (text: string, attachments: Attachment[]) => void;
@@ -59,7 +94,7 @@ export default function ChatInput({
     let alive = true;
     (async () => {
       try {
-        const saved = await SecureStore.getItemAsync(storeKey);
+        const saved = await secureGet(storeKey);
         if (alive && saved) setText(saved);
       } catch {
         // ignore
@@ -73,7 +108,7 @@ export default function ChatInput({
 
   useEffect(() => {
     const t = setTimeout(() => {
-      SecureStore.setItemAsync(storeKey, text).catch(() => {});
+      secureSet(storeKey, text).catch(() => {});
     }, 300);
     return () => clearTimeout(t);
   }, [text, storeKey]);
@@ -90,7 +125,7 @@ export default function ChatInput({
     try {
       const granted = await AudioModule.requestRecordingPermissionsAsync();
       if (!granted.granted) {
-        Alert.alert(
+        showAlert(
           'Microphone needed',
           'Allow microphone access in your phone settings to send voice messages.'
         );
@@ -102,7 +137,7 @@ export default function ChatInput({
       startedAt.current = Date.now();
       autoStop.current = setTimeout(() => stopRecording(), MAX_RECORD_MS);
     } catch (e) {
-      Alert.alert('Could not start recording', 'Please try again.');
+      showAlert('Could not start recording', 'Please try again.');
     }
   };
 
@@ -127,7 +162,7 @@ export default function ChatInput({
       );
       onSend(att.extracted_text ?? '', [att]);
     } catch (e: any) {
-      Alert.alert('Voice message failed', e?.message ?? 'Please try again.');
+      showAlert('Voice message failed', e?.message ?? 'Please try again.');
     } finally {
       setBusy(null);
       await setAudioModeAsync({ allowsRecording: false });
@@ -213,7 +248,7 @@ export default function ChatInput({
       setPending((p) => [...p, att]);
     } catch (e: any) {
       pickerLock.active = false;
-      Alert.alert('Could not add image', e?.message ?? 'Please try again.');
+      showAlert('Could not add image', e?.message ?? 'Please try again.');
     } finally {
       setBusy(null);
     }
@@ -237,7 +272,7 @@ export default function ChatInput({
         asset.mimeType ?? 'application/octet-stream'
       );
       if (!att.extracted_text) {
-        Alert.alert(
+        showAlert(
           'Nothing to read',
           "I couldn't find any text in that file. Scanned pages and images inside PDFs aren't readable yet."
         );
@@ -245,18 +280,60 @@ export default function ChatInput({
       setPending((p) => [...p, att]);
     } catch (e: any) {
       pickerLock.active = false;
-      Alert.alert('Could not add document', e?.message ?? 'Please try again.');
+      showAlert('Could not add document', e?.message ?? 'Please try again.');
     } finally {
       setBusy(null);
     }
   };
 
+  // Web: open the browser's native file picker directly — no confirm dialog.
+  // Accepts both images and documents in one picker.
+  const pickFileWeb = () => {
+    if (typeof document === 'undefined') return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,application/pdf,text/plain,.docx,.doc,.txt';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const isImage = file.type.startsWith('image/');
+      const kind: AttachmentKind = isImage ? 'image' : 'document';
+      setBusy(isImage ? 'Reading image...' : 'Reading document...');
+      try {
+        const uri = URL.createObjectURL(file);
+        const att = await uploadAttachment(
+          uri,
+          kind,
+          file.name,
+          file.type || 'application/octet-stream'
+        );
+        URL.revokeObjectURL(uri);
+        if (!isImage && !att.extracted_text) {
+          showAlert(
+            'Nothing to read',
+            "I couldn't find any text in that file. Scanned pages and images inside PDFs aren't readable yet."
+          );
+        }
+        setPending((p) => [...p, att]);
+      } catch (e: any) {
+        showAlert('Could not add file', e?.message ?? 'Please try again.');
+      } finally {
+        setBusy(null);
+      }
+    };
+    input.click();
+  };
+
   const openAttachMenu = () => {
-    Alert.alert('Attach', 'What would you like to send?', [
-      { text: 'Photo', onPress: pickImage },
-      { text: 'Document', onPress: pickDocument },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    if (Platform.OS === 'web') {
+      pickFileWeb();
+    } else {
+      Alert.alert('Attach', 'What would you like to send?', [
+        { text: 'Photo', onPress: pickImage },
+        { text: 'Document', onPress: pickDocument },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    }
   };
 
   const handleSend = () => {
@@ -265,7 +342,19 @@ export default function ChatInput({
     onSend(trimmed, pending);
     setText('');
     setPending([]);
-    SecureStore.deleteItemAsync(storeKey).catch(() => {});
+    secureDelete(storeKey).catch(() => {});
+  };
+
+  // Web: Enter sends, Shift+Enter adds newline (like ChatGPT / Claude).
+  const handleKeyPress = (e: any) => {
+    if (Platform.OS !== 'web') return;
+    if (e.nativeEvent?.key === 'Enter' && !e.nativeEvent?.shiftKey) {
+      e.preventDefault?.();
+      const trimmed = text.trim();
+      if (trimmed || pending.length > 0) {
+        handleSend();
+      }
+    }
   };
 
   const canSend = !disabled && !busy && (!!text.trim() || pending.length > 0);
@@ -362,6 +451,7 @@ export default function ChatInput({
             placeholderTextColor={theme.textSecondary}
             multiline
             editable={!disabled && !busy}
+            onKeyPress={handleKeyPress}
           />
 
           {canSend ? (

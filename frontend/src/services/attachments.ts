@@ -1,8 +1,9 @@
-/**
+﻿/**
  * Phase 6 - attachments (voice notes, images, documents).
  *
  * Kept in its own file so api.ts is untouched. Uses the same auth pattern.
  */
+import { Platform } from "react-native";
 import { supabase } from "./supabase";
 import type { Attachment, AttachmentKind } from "../types/chat";
 
@@ -35,12 +36,18 @@ export async function uploadAttachment(
 ): Promise<Attachment> {
   const send = async (token: string | undefined) => {
     const form = new FormData();
-    // React Native's FormData takes this {uri,name,type} shape.
-    form.append("file", {
-      uri: localUri,
-      name: fileName,
-      type: mimeType,
-    } as any);
+    if (Platform.OS === "web") {
+      // Web: blob URL must be fetched and wrapped in a real File object.
+      const blob = await (await fetch(localUri)).blob();
+      form.append("file", new File([blob], fileName, { type: mimeType }));
+    } else {
+      // React Native's FormData takes this {uri,name,type} shape.
+      form.append("file", {
+        uri: localUri,
+        name: fileName,
+        type: mimeType,
+      } as any);
+    }
     form.append("kind", kind);
     if (durationMs != null) form.append("duration_ms", String(Math.round(durationMs)));
 
@@ -99,3 +106,5 @@ export async function sendChatWithAttachments(
   if (!res.ok) throw new Error(`Chat failed: ${res.status}`);
   return res.json();
 }
+
+

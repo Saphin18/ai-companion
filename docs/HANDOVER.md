@@ -19,17 +19,20 @@
 
 ## 0.1 Where we are RIGHT NOW
 
-**The app is built through Phase 6. Phases 1-5 are shipped and verified on the real APK.
-Phase 6 (attachments) BACKEND is COMPLETE, tested, and committed. The Phase 6 FRONTEND is
-written and an APK build was started, but is NOT YET TESTED ON A DEVICE.**
+**The app is built through Phase 6 and now has a LIVE WEB VERSION at saphinai.vercel.app.
+Phases 1-5 are shipped and verified on the real APK. Phase 6 (attachments) is complete.
+A web version using Expo Web was built and deployed to Vercel in Section 19.**
 
-> Phase 6 = voice messages (record → auto-transcribed), image reading, document (PDF/DOCX)
-> reading, and the companion speaking replies aloud (hands-free turn mode). Everything runs on
-> the existing Groq key — no new provider, no billing.
+> **SECTION 19 is the NEWEST section and WINS over anything above it where they
+> conflict.** It covers the web version (Expo Web + Vercel deployment) and a
+> timing re-fix for the home-screen mic shortcut (#68). Read Section 19 first,
+> then come back here for stable reference material.
 >
-> **Full Phase 6 detail is in SECTION 16 at the very bottom.** SECTION 16 is the NEWEST section
-> and WINS over anything above it where they conflict. Read it for the current state and the
-> immediate next step (install and test the APK).
+> **Web deploy commands (from frontend/):**
+> ```
+> npx expo export --platform web
+> vercel dist --prod
+> ```
 
 ---
 
@@ -2627,3 +2630,249 @@ until resolved:
   fix is small and independently verified with `tsc`/`expo-doctor` before
   moving to the next one** — this session bundled four separate fixes into a
   single EAS build after verifying each in isolation.
+
+---
+
+# SECTION 19 — Web version (Expo Web + Vercel) & voice fix timing
+
+> **This is the NEWEST section. Read it first. It OVERRIDES earlier sections
+> where they conflict.**
+
+## 19.1 What happened this session
+
+Two things shipped:
+
+1. **Bug #68 re-fix (voice shortcut timing race):** The Section 18.4 fix
+   for the home-screen mic shortcut was structurally correct (separate
+   `triggerRecordSignal` ungated by `handsFree`) but still didn't work
+   on-device. Root cause: the signal fires on mount before the native
+   `useAudioRecorder` hook finishes initializing, so `startRecording()`
+   runs against a recorder that isn't ready yet and silently does nothing.
+   Fix: wrapped the `startRecording()` call inside the `triggerRecordSignal`
+   effect in a 500ms `setTimeout`, giving the native audio module time to
+   initialize. The in-chat mic works instantly because by the time the user
+   taps it manually, the recorder has already initialized. APK build was
+   kicked off but **not yet tested on-device** at session end.
+
+2. **Full web version of the app**, deployed live at **saphinai.vercel.app**.
+   Same backend, same database, same Supabase auth — one account works on
+   both APK and web. Built using Expo Web (Path A: same codebase, not a
+   separate Next.js frontend). All web-specific changes are gated behind
+   `Platform.OS === "web"` checks; the APK is completely unaffected.
+
+## 19.2 Web architecture decisions
+
+- **Path A (Expo Web) chosen over Path B (separate Next.js app).** Rationale:
+  user wanted identical UI/UX across platforms, one codebase to maintain.
+  Path B would have meant rebuilding every screen from scratch.
+- **Responsive sidebar layout on desktop** (like Claude.ai / ChatGPT / Gemini):
+  permanent left sidebar with navigation + chat history, collapsible via a
+  toggle button. When collapsed, a hamburger icon appears to re-open it.
+- **Mobile browser:** falls back to existing hamburger-drawer behavior from
+  the APK (no sidebar changes needed).
+- **Wallpapers:** portrait images (`assets/wallpapers/`) for APK, landscape
+  images (`assets/wallpaper1/`) for web. Platform switch happens inside
+  `makeNatureBackground()` via `Platform.OS === "web"`.
+- **Login page:** wrapped in a max-width 440px centered container on web so
+  it doesn't stretch across the full screen.
+- **Content area:** capped at `maxWidth: 720` and centered, matching how
+  Claude/ChatGPT constrain their content column.
+- **Biometrics/push notifications/AppState lock:** all skipped on web via
+  `IS_WEB` guards in `App.tsx`. Web doesn't need biometric lock or push
+  tokens.
+- **Profile section:** removed from sidebar bottom; profile avatar remains
+  in the main content area (top-right on home screen, same as APK).
+
+## 19.3 Files changed this session (full paths)
+
+### New files
+
+- `frontend/src/components/WebSidebar.tsx` — NEW. Permanent sidebar for web:
+  brand header, collapse button, "New chat" button, navigation items (Chats,
+  Journal, Reminders, Goals, About) with active-state highlighting, scrollable
+  recent chat list, and profile link at bottom (later removed, see 19.4).
+  Only rendered when `Platform.OS === "web"` in App.tsx.
+
+### Modified files
+
+- **`frontend/src/components/ChatInput.tsx`** — the `triggerRecordSignal`
+  `useEffect` now wraps `startRecording()` in a 500ms `setTimeout` to let
+  the native audio recorder finish initializing after mount (19.1 re-fix
+  of #68). Backup at `ChatInput.tsx.bak`.
+
+- **`frontend/App.tsx`** — major web changes, all gated behind
+  `const IS_WEB = Platform.OS === "web"`:
+  - Added imports: `TouchableOpacity`, `Ionicons`, `WebSidebar`.
+  - New state: `webSidebarOpen` (default `true`), `webRefreshKey`.
+  - `syncPushToken()` and `maybeOfferBiometric()` return early on web.
+  - Biometric lock on session init skipped on web.
+  - `Notifications` listener, `AppState` listener, `BackHandler` listener
+    all wrapped in `if (IS_WEB) return;` guards.
+  - `webRefreshKey` increments when `view.name` changes to `"list"` (triggers
+    sidebar chat list refresh).
+  - Auth screen on web: wrapped in a centered `maxWidth: 440` container.
+  - Post-auth content on web: rendered in a `flexDirection: "row"` layout
+    with `WebSidebar` on the left and content area on the right.
+  - Content area constrained to `maxWidth: 720, alignSelf: "center"`.
+  - When sidebar is collapsed, a hamburger icon button appears at
+    `top: 16, left: 16` to re-open it.
+  - Native path: completely unchanged `<>{bar}{content}</>`.
+  - UTF-8 corruption fixed: `\u00e2\u20ac\u201c` comment replaced with `--`.
+  - Backup at `App.tsx.bak`.
+
+- **`frontend/src/screens/ChatsListScreen.tsx`** — two surgical changes:
+  - Hamburger button wrapped in `Platform.OS !== "web"` ternary: on web,
+    renders an empty `<View />` spacer so `justifyContent: "space-between"`
+    still pushes the avatar to the right.
+  - Drawer overlay wrapped in `Platform.OS !== "web" && drawerOpen` guard
+    so the drawer never renders on web (sidebar replaces it).
+
+- **`frontend/src/theme/themes/nature/Background.tsx`** — `makeNatureBackground`
+  now accepts an optional 4th parameter `webWallpaper?: number`. When
+  `Platform.OS === "web"` and a web wallpaper is provided, it uses the
+  landscape image instead of the portrait one. Added `Platform` import.
+
+- **`frontend/src/theme/themes/nature/index.ts`** — each `nature()` call now
+  passes a 8th argument: the web-specific landscape wallpaper from
+  `assets/wallpaper1/`. Mapping:
+  - Mountain Dusk → `wallpaper1/img6.jpg`
+  - Forest Mist → `wallpaper1/img9.jpg`
+  - Snowy Peak → `wallpaper1/img10.jpg`
+  - Swan Lake → `wallpaper1/img13.jpg`
+  - Sunlit Calm → `wallpaper1/img15.jpg`
+  - Emojis switched from corrupted UTF-8 sequences to `\uXXXX` escapes.
+
+### New assets
+
+- `frontend/assets/wallpaper1/` — 11 landscape wallpaper images for web
+  (`img6.jpg` through `img17.jpg`, excluding `img7.jpg`). Only 5 are
+  currently mapped to themes; the rest are available for future themes.
+
+### Packages installed
+
+- `react-dom` — required for Expo Web rendering.
+- `react-native-web` — React Native components for the browser.
+- `@expo/metro-runtime` — Metro bundler runtime for web.
+
+## 19.4 Web UI fixes applied iteratively
+
+1. **Login page stretched full-width** → wrapped in `maxWidth: 440` centered
+   container on web.
+2. **Profile avatar stuck on left side** → hamburger replacement changed from
+   `null` to empty `<View />` spacer so `space-between` still works.
+3. **Profile section crowded with nav in sidebar** → removed profile from
+   sidebar bottom; avatar stays in main content area top-right.
+4. **Content area too wide on desktop** → added `maxWidth: 720` wrapper
+   around all content in the web layout.
+5. **Portrait wallpapers zoomed/cropped on landscape screens** → added web
+   wallpaper support with landscape images from `wallpaper1/`.
+
+## 19.5 Deployment
+
+**Live URL:** `https://saphinai.vercel.app`
+
+**Hosting:** Vercel (free Hobby tier), deployed via CLI (not connected to
+Git repo — manual deploys only, intentional choice so APK-only pushes
+don't trigger unnecessary web deploys).
+
+**Deploy commands (run from `frontend/`):**
+
+```powershell
+cd C:\Users\saphi\Desktop\Ai-Companion\frontend
+npx expo export --platform web
+vercel dist --prod
+```
+
+First command builds the web bundle into `dist/`. Second command uploads
+it to Vercel. Takes ~15 seconds total. Run these two commands any time
+you want to update the live website.
+
+**Vercel project name:** `saphinai` (under team `saphin18s-projects`).
+
+**Local dev (for testing before deploying):**
+
+```powershell
+cd C:\Users\saphi\Desktop\Ai-Companion\frontend
+npx expo start --web
+```
+
+Opens at `localhost:8081`. Use this to test web changes before deploying.
+
+## 19.6 APK build status
+
+An APK build was kicked off bundling the voice fix timing change (19.1)
+BEFORE the web work started. The web changes are frontend-only and gated
+behind `Platform.OS === "web"`, so they will NOT affect the APK. However,
+the next APK build should include all web-session file changes too
+(App.tsx, ChatsListScreen.tsx, nature theme files) — they are inert on
+native but should be in the codebase.
+
+**APK test checklist (same as 18.9 items 1-7, plus one new item):**
+
+8. **Home-screen mic shortcut with timing fix** — tap the home-screen mic
+   button → should open a new chat AND start recording within ~0.5 seconds,
+   no second tap needed. This is the re-fix of #68 with the `setTimeout`
+   approach.
+
+## 19.7 Known web issues (not yet fixed)
+
+- **Sidebar icons showing as empty squares on deployed version** — Ionicons
+  font not loading correctly in the Vercel build. Works fine on localhost.
+  Likely needs an explicit font-loading step in the web build config.
+- **Profile screen layout too wide before maxWidth was added** — now fixed
+  by the 720px content wrapper, but individual screen layouts (profile,
+  journal, goals, etc.) may still benefit from web-specific spacing tweaks.
+- **Voice recording on web** — not yet tested. `expo-audio` may need a
+  Web MediaRecorder fallback. The mic button appears but recording behavior
+  on web browsers is unverified.
+- **expo-secure-store on web** — used for draft persistence in ChatInput.
+  May silently fail on web (drafts won't persist across page reloads). A
+  `localStorage` fallback for web has not been implemented yet.
+- **expo-speech on web** — companion speaking replies aloud (hands-free
+  mode) uses `expo-speech`. Web Speech API fallback not implemented yet.
+
+## 19.8 Commits this session
+
+One commit pushed before the web work began:
+
+1. `"Fix home-screen mic shortcut: add 500ms delay for native recorder
+   init"` — the timing re-fix for #68 in ChatInput.tsx.
+
+Web changes were NOT committed yet at session end. Before the next APK
+build, all web-session changes should be committed:
+
+```powershell
+cd C:\Users\saphi\Desktop\Ai-Companion\frontend
+git add -A
+git commit -m "Add Expo Web support with responsive sidebar, deploy to Vercel"
+git push origin main
+```
+
+## 19.9 Still outstanding from earlier sections (unchanged)
+
+Carried over from 18.10, still open:
+
+- \uD83D\uDD34 Rotate the exposed Supabase DB password AND `CRON_SECRET`. STILL not
+  done across at least THREE sessions now.
+- \uD83D\uDFE0 Build a development build (`eas build --profile development`).
+- \uD83D\uDFE1 Add FCM key to the `production` EAS profile.
+- \uD83D\uDFE1 Delete the stale Expo Go row from `push_tokens`.
+- \uD83D\uDFE1 Clear test uploads from `attachments` table + storage bucket.
+- \uD83D\uDFE1 Consider per-attachment summary for multi-message document discussion.
+
+## 19.10 Rules from this session
+
+- **`Platform.OS === "web"` is the gating mechanism for ALL web-specific
+  code.** Never use browser-only APIs (like `window`, `document`,
+  `localStorage`) without this check — the same code runs on native.
+- **Don't pile web changes on top of untested APK fixes.** We kicked off the
+  APK build for the voice fix BEFORE starting web work, so if the voice fix
+  fails, we know it's not contaminated by web changes.
+- **Portrait wallpapers don't work on landscape screens.** Always provide
+  separate landscape assets for web when using photo wallpapers.
+- **`justifyContent: "space-between"` breaks when you remove a child.**
+  When hiding an element on one platform, replace it with an empty `<View />`
+  spacer, not `null`, so the layout math doesn't change.
+- **Vercel deploy is two commands, not connected to Git.** This is
+  intentional — don't connect the repo until the app stabilizes, or every
+  `git push` (including APK-only fixes) triggers a web deploy.
