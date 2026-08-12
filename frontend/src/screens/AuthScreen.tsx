@@ -230,7 +230,12 @@ export default function AuthScreen() {
         }
       }
     } catch (e: any) {
-      showAlert("Error", e.message ?? "Something went wrong.");
+      const msg = e.message ?? "Something went wrong.";
+      if (msg.toLowerCase().includes("invalid login credentials")) {
+        showAlert("Couldn't log in", "Wrong email or password. Don't have an account yet? Tap \"Create an account\" below.");
+      } else {
+        showAlert("Error", msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -506,5 +511,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+
 
 
