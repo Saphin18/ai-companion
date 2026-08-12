@@ -30,7 +30,7 @@ function showAlert(title: string, message: string) {
   if (Platform.OS === "web" && typeof window !== "undefined") {
     window.alert(title + "\n\n" + message);
   } else {
-    showAlert(title, message);
+    Alert.alert(title, message);
   }
 }
 
@@ -506,4 +506,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+
 
