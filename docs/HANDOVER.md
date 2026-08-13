@@ -2876,3 +2876,205 @@ Carried over from 18.10, still open:
 - **Vercel deploy is two commands, not connected to Git.** This is
   intentional — don't connect the repo until the app stabilizes, or every
   `git push` (including APK-only fixes) triggers a web deploy.
+
+
+# SECTION 20 — Session 20: Web hardening, landing page, auth UX (Aug 2026)
+
+## 20.1 What was done
+
+This session fixed critical web deployment issues, added a landing/welcome
+page, and improved auth UX for both APK and web.
+
+### Web fixes (all gated behind `Platform.OS === "web"`)
+
+1. **Responsive mobile web layout** — `Platform.OS === "web"` doesn't
+   distinguish phone browsers from desktop browsers. Added
+   `useWindowDimensions()` + `isDesktopWeb = IS_WEB && width >= 768`.
+   Desktop web gets the sidebar layout; mobile web gets the hamburger/drawer
+   just like the native APK.
+   - **Files changed:** `App.tsx`, `ChatsListScreen.tsx`
+
+2. **Ionicons font loading** — Icons rendered as empty squares on Vercel.
+   Tried three approaches: CDN URL (wrong font version), `require()` (not
+   resolved in static export), and finally **copying the TTF to `public/fonts/`
+   and injecting a `@font-face` CSS rule at module load time**. The last
+   approach works because `public/` files are copied to `dist/` without
+   hashing.
+   - **Files changed:** `App.tsx` (top-level `if` block)
+   - **New file:** `frontend/public/fonts/Ionicons.ttf`
+   - `Font.loadAsync(Ionicons.font)` also runs as a backup in a useEffect.
+
+3. **Alert.alert on web** — Multi-button `Alert.alert` (Photo/Document/Cancel)
+   does nothing on web. Two-argument `Alert.alert` (title + message) sometimes
+   works via `window.alert` but is unreliable. Added `showAlert()` helper in
+   `AuthScreen.tsx` and `ChatInput.tsx` that uses `window.alert` on web,
+   native `Alert.alert` otherwise.
+   - **CRITICAL BUG FOUND AND FIXED:** The global `.Replace('Alert.alert(', 'showAlert(')`
+     also replaced the `Alert.alert` INSIDE the `showAlert` function itself,
+     creating infinite recursion. On native, every alert silently crashed
+     (stack overflow). This broke sign up AND login on the APK. Fixed by
+     restoring `Alert.alert` inside the `showAlert` else-branch.
+
+4. **SecureStore on web** — `expo-secure-store` throws on web. Added
+   `secureGet/secureSet/secureDelete` wrappers in `ChatInput.tsx` that use
+   `localStorage` on web, `SecureStore` on native. Draft persistence now
+   works on both platforms.
+
+5. **File upload on web (422 fix)** — React Native's `FormData` accepts
+   `{uri, name, type}` objects, but browser `FormData` needs real `File`/`Blob`.
+   Added a `Platform.OS === "web"` branch in `attachments.ts` that fetches
+   the blob URL and wraps it in `new File([blob], ...)`.
+
+6. **Attach menu on web** — The multi-button `Alert.alert` for
+   Photo/Document/Cancel does nothing on web. Replaced with `pickFileWeb()`
+   that creates a hidden `<input type="file">` accepting both images and
+   documents. Browser's native file picker opens directly — no intermediate
+   dialog.
+
+7. **Enter-to-send on web** — Added `onKeyPress` handler to ChatInput's
+   TextInput. On web: Enter sends, Shift+Enter adds newline (like ChatGPT).
+   Native keyboard behavior untouched.
+
+### Auth UX improvements (both APK and web)
+
+8. **Friendly "wrong credentials" message** — Supabase returns "Invalid login
+   credentials" for both wrong password and non-existent accounts. Now shows:
+   "Wrong email or password. Don't have an account yet? Tap 'Create an account'
+   below." instead of a generic "Error" alert.
+
+9. **Landing page (new screen)** — First-time users and signed-out users now
+   see a warm welcome page instead of going straight to login. Shows:
+   - App orb + "Your Companion" branding
+   - Three feature cards (talk, journal, privacy) — no app name in descriptions
+     so it's future-proof if the name changes
+   - "Get started" button → sign up form
+   - "I already have an account" button → login form
+   - Back arrow on auth screens returns to landing
+   - Android hardware back button also returns to landing
+   - Resets to landing on sign out
+   - **New file:** `frontend/src/screens/LandingScreen.tsx`
+   - **Modified:** `AuthScreen.tsx` (added `initialSignUp` and `onBack` props)
+   - **Modified:** `App.tsx` (added `authView` state: `landing` | `signup` | `login`)
+
+10. **Creator portfolio URL update** — Changed from `saphinpraja.vercel.app`
+    to `saphinpraja.com.np` in `backend/app/ai/groq_provider.py`.
+
+### Desktop web responsive layout
+
+11. **Landing page** — Full-screen gradient, centered content, side-by-side
+    buttons on desktop. Vertical stack on mobile.
+
+12. **Auth screens** — Full-screen gradient with form constrained to
+    `maxWidth: 440` centered. Back button inside the content area (not stuck
+    in the far corner).
+
+## 20.2 Files changed this session
+
+### New files
+- `frontend/src/screens/LandingScreen.tsx` — Welcome page with feature cards
+- `frontend/public/fonts/Ionicons.ttf` — Ionicons font for web deployment
+
+### Modified frontend files
+- `frontend/App.tsx` — `isDesktopWeb`, font loading, `authView` landing flow
+- `frontend/src/screens/AuthScreen.tsx` — `showAlert`, `initialSignUp`, `onBack`, friendly error, `maxWidth: 440`
+- `frontend/src/screens/ChatsListScreen.tsx` — `isDesktopWeb` for hamburger/drawer
+- `frontend/src/components/ChatInput.tsx` — `showAlert`, `secureGet/Set/Delete`, `pickFileWeb`, `handleKeyPress`
+- `frontend/src/services/attachments.ts` — `Platform` import, web `File` blob handling
+
+### Modified backend files
+- `backend/app/ai/groq_provider.py` — Creator portfolio URL update
+
+## 20.3 Code contracts added/changed
+
+### `LandingScreen.tsx` props
+```
+type Props = {
+  onGetStarted: () => void;   // navigates to sign up
+  onLogin: () => void;        // navigates to login
+};
+```
+
+### `AuthScreen.tsx` props (NEW — was propless before)
+```
+type Props = {
+  initialSignUp?: boolean;    // default false — pre-sets sign up or login mode
+  onBack?: () => void;        // shows back arrow, returns to landing
+};
+```
+
+### `App.tsx` auth flow state
+```
+type AuthView = "landing" | "signup" | "login";
+// Resets to "landing" on sign out via onAuthStateChange
+```
+
+### `isDesktopWeb` pattern (used in App.tsx and ChatsListScreen.tsx)
+```
+const IS_WEB = Platform.OS === "web";              // feature gating
+const isDesktopWeb = IS_WEB && windowWidth >= 768;  // layout gating
+```
+- `IS_WEB` → gates features: biometrics, push tokens, AppState lock, SecureStore
+- `isDesktopWeb` → gates layout: sidebar vs drawer, auth wrapper width
+
+## 20.4 Bugs found and fixed this session
+
+| # | Bug | Root cause | Fix |
+|---|-----|-----------|-----|
+| 73 | Icons empty squares on Vercel | Ionicons TTF not served in static export | Copy to `public/fonts/`, inject `@font-face` CSS |
+| 74 | Attach menu does nothing on web | `Alert.alert` with 3 buttons is no-op on web | `pickFileWeb()` with hidden `<input type="file">` |
+| 75 | File upload 422 on web | Browser FormData needs `File` not `{uri}` | Fetch blob, wrap in `new File()` |
+| 76 | **Sign up and login completely dead on APK** | `showAlert` called itself recursively (infinite loop → stack overflow) | Restore `Alert.alert` inside `showAlert` else-branch |
+| 77 | "Invalid login credentials" unhelpful | Supabase returns same error for wrong password and non-existent account | Friendly message nudging toward "Create an account" |
+| 78 | SecureStore crashes on web | `expo-secure-store` not supported on web | `localStorage` fallback wrappers |
+| 79 | Auth screens stretched full-width on desktop web | No maxWidth constraint when wrapper removed | `maxWidth: 440` on inner content, gradient full-screen |
+| 80 | Encoding bug "â€"" instead of em dash | UTF-8 encoding issue in PowerShell Set-Content | Replaced with simple hyphen |
+
+## 20.5 Known web issues resolved from 19.7
+
+- ✅ Sidebar icons empty squares → fixed (public/fonts + @font-face)
+- ✅ expo-secure-store on web → fixed (localStorage fallback)
+- ⚠️ Voice recording on web → works but with ~1.5s delay on start
+- ❌ expo-speech on web → still not implemented (hands-free TTS)
+
+## 20.6 Commits this session
+
+1. `"web: responsive mobile layout, fix Ionicons, web-safe alerts/attachments/storage"`
+2. `"fix: AuthScreen recursive alert bug, update creator portfolio URL"`
+3. `"auth: friendly error message for wrong credentials"`
+4. `"feat: landing page, responsive auth, friendly login errors, back navigation"`
+
+## 20.7 Still outstanding (carried from 19.9 + new)
+
+- 🔴 Rotate the exposed Supabase DB password AND `CRON_SECRET`. STILL not
+  done across FOUR sessions now.
+- 🟠 Build a development build (`eas build --profile development`).
+- 🟡 Add FCM key to the `production` EAS profile.
+- 🟡 Delete the stale Expo Go row from `push_tokens`.
+- 🟡 Clear test uploads from `attachments` table + storage bucket.
+- 🟡 Consider per-attachment summary for multi-message document discussion.
+- 🟢 **NEW:** App-wide wallpaper/theme feature — user picks from gallery or
+  presets, applies as background to every screen. Architecture planned
+  (AppBackground wrapper, ThemeContext extension, WallpaperPickerScreen).
+  Build in next session.
+- 🟢 **NEW:** expo-speech Web Speech API fallback for hands-free TTS on web.
+
+## 20.8 Rules from this session
+
+- **Never use global `.Replace('Alert.alert(', 'showAlert(')`.** It will
+  replace the `Alert.alert` inside the `showAlert` function itself, creating
+  infinite recursion. Always target specific occurrences or exclude the
+  helper function definition.
+- **`isDesktopWeb` for layout, `IS_WEB` for features.** Don't use `IS_WEB`
+  to decide sidebar vs drawer — mobile browsers also report `web`.
+- **Three approaches to web font loading were tried.** CDN URL fails (version
+  mismatch), `require()` fails (not resolved in static export), `public/`
+  folder works (files copied to `dist/` without hashing).
+- **Browser `FormData` needs `File` objects, not `{uri, name, type}`.** The
+  React Native shorthand only works on native. On web, fetch the blob URL
+  and wrap in `new File([blob], fileName, { type })`.
+- **`expo-secure-store` throws on web — always wrap with a platform check.**
+  Use `localStorage` as fallback. Same pattern should be applied anywhere
+  SecureStore is used.
+- **Auth screen props are now optional.** `initialSignUp` defaults to `false`,
+  `onBack` defaults to `undefined` (no back arrow). Existing callers work
+  without changes.
