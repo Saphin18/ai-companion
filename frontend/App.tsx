@@ -28,6 +28,7 @@ import {
   isBiometricAvailable,
   isBiometricEnabled,
 } from "./src/services/biometrics";
+import LandingScreen from "./src/screens/LandingScreen";
 import AuthScreen from "./src/screens/AuthScreen";
 import LockScreen from "./src/screens/LockScreen";
 import ChatsListScreen from "./src/screens/ChatsListScreen";
@@ -47,6 +48,8 @@ type View3 =
   | { name: "reminders" }
   | { name: "goals" }
   | { name: "about" };
+
+type AuthView = "landing" | "signup" | "login";
 
 const IS_WEB = Platform.OS === "web";
 
@@ -111,6 +114,7 @@ function Root() {
   const [ready, setReady] = useState(false);
   const [locked, setLocked] = useState(false);
   const [view, setView] = useState<View3>({ name: "list" });
+  const [authView, setAuthView] = useState<AuthView>("landing");
 
   const [webSidebarOpen, setWebSidebarOpen] = useState(true);
   const [webRefreshKey, setWebRefreshKey] = useState(0);
@@ -153,6 +157,10 @@ function Root() {
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
       setView({ name: "list" });
+      if (!s) {
+        // Reset to landing page on sign out
+        setAuthView("landing");
+      }
       if (s && event === "SIGNED_IN") {
         setLocked(false);
         syncProfile(s, hydrateFromServer);
@@ -205,6 +213,11 @@ function Root() {
   useEffect(() => {
     if (IS_WEB) return;
     const onBackPress = () => {
+      // Handle back from auth screens to landing
+      if (!session && authView !== "landing") {
+        setAuthView("landing");
+        return true;
+      }
       if (
         view.name === "chat" ||
         view.name === "profile" ||
@@ -220,7 +233,7 @@ function Root() {
     };
     const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
     return () => sub.remove();
-  }, [view]);
+  }, [view, session, authView]);
 
   useEffect(() => {
     if (IS_WEB && view.name === "list") {
@@ -249,22 +262,49 @@ function Root() {
   }
 
   if (!session) {
+    // --- Landing page / Auth flow ---
+    if (authView === "landing") {
+      if (isDesktopWeb) {
+        return (
+          <>
+            {bar}
+            <LandingScreen
+              onGetStarted={() => setAuthView("signup")}
+              onLogin={() => setAuthView("login")}
+            />
+          </>
+        );
+      }
+      return (
+        <>
+          {bar}
+          <LandingScreen
+            onGetStarted={() => setAuthView("signup")}
+            onLogin={() => setAuthView("login")}
+          />
+        </>
+      );
+    }
+
+    // Sign up or login screen
     if (isDesktopWeb) {
       return (
         <>
           {bar}
-          <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: theme.background }}>
-            <View style={{ width: "100%", maxWidth: 440, paddingHorizontal: 20 }}>
-              <AuthScreen />
-            </View>
-          </View>
+          <AuthScreen
+            initialSignUp={authView === "signup"}
+            onBack={() => setAuthView("landing")}
+          />
         </>
       );
     }
     return (
       <>
         {bar}
-        <AuthScreen />
+        <AuthScreen
+          initialSignUp={authView === "signup"}
+          onBack={() => setAuthView("landing")}
+        />
       </>
     );
   }
@@ -383,6 +423,5 @@ export default function App() {
     </ThemeProvider>
   );
 }
-
 
 

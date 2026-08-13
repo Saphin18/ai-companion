@@ -24,7 +24,6 @@ import {
   enableBiometric,
 } from "../services/biometrics";
 
-// Where Supabase sends the recovery email link (backend-hosted reset page).
 // Cross-platform alert: window.alert on web, native Alert elsewhere
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -34,20 +33,26 @@ function showAlert(title: string, message: string) {
   }
 }
 
+// Where Supabase sends the recovery email link (backend-hosted reset page).
 const RESET_REDIRECT_URL =
   "https://saphin-ai-backend.onrender.com/reset-password";
 
 // Keyboard: iOS uses KeyboardAvoidingView (padding); Android uses a plain View and
-// lets the OS "resize" mode lift the screen (stacking both doubled it — handover §9 #26).
+// lets the OS "resize" mode lift the screen (stacking both doubled it â€” handover Â§9 #26).
 const KeyboardWrapper: any = Platform.OS === "ios" ? KeyboardAvoidingView : View;
 
-export default function AuthScreen() {
+type Props = {
+  initialSignUp?: boolean;
+  onBack?: () => void;
+};
+
+export default function AuthScreen({ initialSignUp = false, onBack }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(initialSignUp);
   const [loading, setLoading] = useState(false);
   const [canUseBiometric, setCanUseBiometric] = useState(false);
 
@@ -113,7 +118,7 @@ export default function AuthScreen() {
     if (!email.trim()) {
       showAlert(
         "Enter your email",
-        "Type your account email in the Email field above, then tap “Forgot password?” again."
+        "Type your account email in the Email field above, then tap \u201CForgot password?\u201D again."
       );
       return;
     }
@@ -261,6 +266,11 @@ export default function AuthScreen() {
           <Animated.View
             style={[styles.inner, { opacity: fade, transform: [{ translateY: slide }] }]}
           >
+            {onBack && (
+              <TouchableOpacity style={styles.backBtn} onPress={onBack}>
+                <Ionicons name="arrow-back" size={22} color="#c9c6e0" />
+              </TouchableOpacity>
+            )}
             <View style={styles.brand}>
               <View style={styles.orb} />
               <Text style={styles.appName}>Your Companion</Text>
@@ -422,8 +432,13 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   gradient: { flex: 1 },
   flex: { flex: 1 },
-  scrollContent: { flexGrow: 1, justifyContent: "center", padding: 28 },
-  inner: {},
+  scrollContent: { flexGrow: 1, justifyContent: "center", padding: 28, alignItems: "center" },
+  inner: { width: "100%", maxWidth: 440 },
+  backBtn: {
+    alignSelf: "flex-start",
+    padding: 8,
+    marginBottom: 8,
+  },
   brand: { alignItems: "center", marginBottom: 36 },
   orb: {
     width: 72,
@@ -511,6 +526,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+
 
 
 
