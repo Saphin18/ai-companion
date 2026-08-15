@@ -2,6 +2,7 @@
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,8 +10,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
-import { createGoal, listGoals, updateGoal, Goal } from "../services/api";
+import { createGoal, listGoals, updateGoal, deleteGoal, Goal } from "../services/api";
 
 export default function GoalsScreen({ onBack }: { onBack: () => void }) {
   const { theme } = useTheme();
@@ -23,6 +25,7 @@ export default function GoalsScreen({ onBack }: { onBack: () => void }) {
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function refresh() {
     try {
@@ -53,6 +56,29 @@ export default function GoalsScreen({ onBack }: { onBack: () => void }) {
       Alert.alert("Could not save", "Please try again.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete(g: Goal) {
+    const doDelete = async () => {
+      setDeletingId(g.id);
+      const backup = [...items];
+      setItems((prev) => prev.filter((x) => x.id !== g.id));
+      try {
+        await deleteGoal(g.id);
+      } catch {
+        setItems(backup);
+      } finally {
+        setDeletingId(null);
+      }
+    };
+    if (Platform.OS === "web") {
+      if (window.confirm("Remove this goal?")) doDelete();
+    } else {
+      Alert.alert("Remove goal", "Are you sure?", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Remove", style: "destructive", onPress: doDelete },
+      ]);
     }
   }
 
@@ -118,6 +144,9 @@ export default function GoalsScreen({ onBack }: { onBack: () => void }) {
               <TouchableOpacity onPress={() => complete(g)} hitSlop={8}>
                 <Text style={{ color: theme.accent, fontSize: 14 }}>Done</Text>
               </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDelete(g)} hitSlop={8} style={{ marginLeft: 12 }}>
+                <Ionicons name="close" size={18} color={theme.danger ?? "#e74c3c"} />
+              </TouchableOpacity>
             </View>
           ))
         )}
@@ -147,4 +176,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
 });
+
+
+
+
+
 

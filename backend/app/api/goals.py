@@ -1,5 +1,5 @@
 ﻿import uuid
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.auth.dependencies import get_current_user_id
@@ -38,3 +38,17 @@ async def update_goal(
     if values:
         await repo.update_goal(db, str(user_id), goal_id, values)
     return {"ok": True}
+
+
+@router.delete("/goals/{goal_id}")
+async def delete_goal(
+    goal_id: str,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    deleted = await repo.delete_goal(db, str(user_id), goal_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    return {"ok": True}
+
+

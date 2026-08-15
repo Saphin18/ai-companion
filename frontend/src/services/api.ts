@@ -355,6 +355,14 @@ export async function listGoals(status?: string): Promise<Goal[]> {
   return res.json();
 }
 
+export async function deleteGoal(id: string): Promise<void> {
+  const res = await fetch(`${API_URL}/goals/${id}`, {
+    method: "DELETE",
+    headers: await authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Goal delete failed: ${res.status}`);
+}
+
 export async function updateGoal(
   id: string,
   patch: { status?: string; title?: string; detail?: string | null }

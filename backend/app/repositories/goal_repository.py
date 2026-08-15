@@ -31,8 +31,21 @@ async def update_goal(db, user_id, goal_id, values):
     await db.commit()
 
 
+async def delete_goal(db, user_id, goal_id):
+    result = await db.execute(
+        select(Goal).where(Goal.id == goal_id, Goal.user_id == user_id)
+    )
+    row = result.scalar_one_or_none()
+    if not row:
+        return False
+    await db.delete(row)
+    await db.flush()
+    return True
+
+
 async def active_goal_titles(db, user_id):
     result = await db.execute(
         select(Goal.title).where(Goal.user_id == user_id, Goal.status == "active")
     )
     return [r[0] for r in result.all()]
+
