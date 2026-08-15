@@ -40,6 +40,7 @@ type Props = {
   onOpenReminders: () => void;
   onOpenGoals: () => void;
   onOpenAbout: () => void;
+  onOpenWallpaper: () => void;
 };
 
 const SCREEN_W = Dimensions.get("window").width;
@@ -61,6 +62,7 @@ export default function ChatsListScreen({
   onOpenReminders,
   onOpenGoals,
   onOpenAbout,
+  onOpenWallpaper,
 }: Props) {
   const { theme } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
@@ -320,7 +322,7 @@ export default function ChatsListScreen({
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <View style={[styles.container, { backgroundColor: "transparent" }]}>
       {Platform.OS === "ios" ? (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
           {homeBody}
@@ -367,6 +369,7 @@ export default function ChatsListScreen({
             {drawerItem("\u23F0  Reminders", onOpenReminders)}
             {drawerItem("\uD83C\uDFAF  Goals", onOpenGoals)}
             {drawerItem("\u2139\uFE0F  About", onOpenAbout)}
+            {drawerItem("\uD83C\uDFA8  Wallpaper", onOpenWallpaper)}
 
             <View style={[styles.drawerDivider, { backgroundColor: theme.border }]} />
             <Text style={[styles.recentsLabel, { color: theme.textSecondary }]}>
@@ -630,4 +633,3 @@ const styles = StyleSheet.create({
   },
   renameSaveText: { fontSize: 15, fontWeight: "700" },
 });
-

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -33,7 +33,6 @@ import {
 } from "../services/notifications";
 import { registerPushToken } from "../services/api";
 import { useTheme, ThemeMode } from "../context/ThemeContext";
-import { ThemePicker } from "../theme/components";
 import { pickerLock } from "../services/pickerLock";
 import {
   isBiometricAvailable,
@@ -429,7 +428,7 @@ export default function ProfileScreen({ onClose }: Props) {
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: theme.background }]}>
+      <View style={[styles.center, { backgroundColor: "transparent" }]}>
         <ActivityIndicator color={theme.accent} />
       </View>
     );
@@ -533,9 +532,6 @@ export default function ProfileScreen({ onClose }: Props) {
             );
           })}
         </View>
-
-        <Text style={[styles.label, { color: theme.textSecondary }]}>Theme</Text>
-        <ThemePicker />
 
         <Text style={[styles.label, { color: theme.textSecondary }]}>
           Companion personality

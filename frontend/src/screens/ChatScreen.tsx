@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -194,7 +194,7 @@ export default function ChatScreen({ sessionId, onBack, initialMessage, initialA
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: theme.background }]}>
+      <View style={[styles.center, { backgroundColor: "transparent" }]}>
         <ActivityIndicator color={theme.accent} />
       </View>
     );
@@ -248,7 +248,7 @@ export default function ChatScreen({ sessionId, onBack, initialMessage, initialA
   if (Platform.OS === "ios") {
     return (
       <KeyboardAvoidingView
-        style={[styles.container, { backgroundColor: theme.background }]}
+        style={[styles.container, { backgroundColor: "transparent" }]}
         behavior="padding"
       >
         {body}
@@ -257,7 +257,7 @@ export default function ChatScreen({ sessionId, onBack, initialMessage, initialA
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <View style={[styles.container, { backgroundColor: "transparent" }]}>
       {body}
     </View>
   );

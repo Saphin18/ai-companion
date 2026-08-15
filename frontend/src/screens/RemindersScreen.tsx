@@ -118,7 +118,7 @@ export default function RemindersScreen({ onBack }: { onBack: () => void }) {
   const mm = time.getMinutes().toString().padStart(2, "0");
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.background }}>
+    <View style={{ flex: 1, backgroundColor: "transparent" }}>
       <View style={[styles.header, { borderBottomColor: border }]}>
         <TouchableOpacity onPress={onBack} hitSlop={12}>
           <Text style={{ color: theme.accent, fontSize: 16 }}>Back</Text>

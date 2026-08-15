@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   createContext,
   useContext,
   useEffect,
@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useColorScheme, View, Animated, StyleSheet } from "react-native";
+import { useColorScheme, View, Animated, Image, StyleSheet } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { updateThemePreference, updateThemeId } from "../services/api";
 import { ThemeDefinition, ThemeMode, ThemeVariant } from "./types";
@@ -18,6 +18,7 @@ export type { ThemeMode };
 
 const MODE_KEY = "theme_pref"; // unchanged key -> existing users keep their mode
 const THEME_ID_KEY = "theme_id";
+const CUSTOM_WP_KEY = "custom_wallpaper";
 
 type Ctx = {
   mode: ThemeMode;
@@ -25,8 +26,10 @@ type Ctx = {
   theme: ThemeVariant; // resolved flat tokens (what screens read)
   definition: ThemeDefinition; // full theme (for animated bg/loader)
   themes: ThemeDefinition[];
+  customWallpaper: string | null;
   setMode: (m: ThemeMode) => void;
   setThemeId: (id: string) => void;
+  setCustomWallpaper: (uri: string | null) => void;
   hydrateFromServer: (mode?: ThemeMode | null, themeId?: string | null) => void;
 };
 
@@ -39,6 +42,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [cacheLoaded, setCacheLoaded] = useState(false);
   const [hadModeCache, setHadModeCache] = useState(false);
   const [hadThemeCache, setHadThemeCache] = useState(false);
+  const [customWp, setCustomWpState] = useState<string | null>(null);
 
   // Apply saved choices immediately on launch (no network needed).
   useEffect(() => {
@@ -60,6 +64,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           setThemeIdState(savedId);
           setHadThemeCache(true);
         }
+        const savedWp = await AsyncStorage.getItem(CUSTOM_WP_KEY);
+        if (savedWp) {
+          setCustomWpState(savedWp);
+        }
       } catch {}
       setCacheLoaded(true);
     })();
@@ -77,6 +85,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setHadThemeCache(true);
     AsyncStorage.setItem(THEME_ID_KEY, id).catch(() => {});
     updateThemeId(id).catch(() => {}); // best-effort server sync
+  };
+
+  const setCustomWallpaper = (uri: string | null) => {
+    setCustomWpState(uri);
+    if (uri) {
+      AsyncStorage.setItem(CUSTOM_WP_KEY, uri).catch(() => {});
+    } else {
+      AsyncStorage.removeItem(CUSTOM_WP_KEY).catch(() => {});
+    }
   };
 
   // On login we learn the server values; adopt each only if this device has no
@@ -126,11 +143,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       theme,
       definition,
       themes: THEMES,
+      customWallpaper: customWp,
       setMode,
       setThemeId,
+      setCustomWallpaper,
       hydrateFromServer,
     }),
-    [mode, themeId, theme, definition, cacheLoaded, hadModeCache, hadThemeCache]
+    [mode, themeId, theme, definition, customWp, cacheLoaded, hadModeCache, hadThemeCache]
   );
 
   // The current theme's optional animated background (waves for One Piece).
@@ -148,6 +167,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         {Bg ? (
           <View pointerEvents="none" style={StyleSheet.absoluteFill}>
             <Bg isDark={theme.isDark} />
+          </View>
+        ) : null}
+        {/* custom wallpaper layer (user-picked photo from gallery) */}
+        {customWp ? (
+          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+            <Image
+              source={{ uri: customWp }}
+              style={[StyleSheet.absoluteFill, { opacity: 0.4 }]}
+              resizeMode="cover"
+            />
           </View>
         ) : null}
         {children}

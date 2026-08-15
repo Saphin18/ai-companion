@@ -1,16 +1,19 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import {
   createJournalEntry,
+  deleteJournalEntry,
   listJournalEntries,
   JournalEntry,
 } from "../services/api";
@@ -27,6 +30,7 @@ export default function JournalScreen({ onBack }: Props) {
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
   const [latest, setLatest] = useState<JournalEntry | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -65,11 +69,43 @@ export default function JournalScreen({ onBack }: Props) {
     }
   };
 
+  const handleDelete = (item: JournalEntry) => {
+    const doDelete = async () => {
+      setDeletingId(item.id);
+      const prev = entries;
+      setEntries((cur) => cur.filter((e) => e.id !== item.id));
+      if (latest?.id === item.id) setLatest(null);
+      try {
+        await deleteJournalEntry(item.id);
+      } catch (e) {
+        console.warn(e);
+        setEntries(prev);
+        Alert.alert("Couldn't delete", "Please try again.");
+      } finally {
+        setDeletingId(null);
+      }
+    };
+
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      const yes = window.confirm("Are you sure you want to delete this entry?");
+      if (yes) doDelete();
+    } else {
+      Alert.alert(
+        "Delete entry",
+        "Are you sure you want to delete this journal entry?",
+        [
+          { text: "No", style: "cancel" },
+          { text: "Yes", style: "destructive", onPress: doDelete },
+        ]
+      );
+    }
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <View style={[styles.container, { backgroundColor: "transparent" }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack}>
-          <Text style={[styles.back, { color: theme.accent }]}>‹ Back</Text>
+          <Text style={[styles.back, { color: theme.accent }]}>{"\u2039"} Back</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Journal</Text>
         <View style={{ width: 50 }} />
@@ -151,6 +187,18 @@ export default function JournalScreen({ onBack }: Props) {
               <Text style={[styles.entryDate, { color: theme.textSecondary }]}>
                 {formatDate(item.created_at)}
               </Text>
+              <TouchableOpacity
+                onPress={() => handleDelete(item)}
+                hitSlop={10}
+                disabled={deletingId === item.id}
+                style={styles.deleteBtn}
+              >
+                {deletingId === item.id ? (
+                  <ActivityIndicator size="small" color={theme.textSecondary} />
+                ) : (
+                  <Ionicons name="close" size={18} color={theme.textSecondary} />
+                )}
+              </TouchableOpacity>
             </View>
             <Text style={[styles.entryContent, { color: theme.textPrimary }]}>
               {item.content}
@@ -205,8 +253,16 @@ const styles = StyleSheet.create({
   empty: { textAlign: "center", marginTop: 24, fontSize: 15 },
 
   entry: { borderRadius: 12, padding: 14, marginBottom: 10 },
-  entryHeader: { flexDirection: "row", justifyContent: "flex-end", marginBottom: 4 },
+  entryHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
   entryDate: { fontSize: 12 },
+  deleteBtn: {
+    padding: 4,
+  },
   entryContent: { fontSize: 15, lineHeight: 21 },
   entryReflection: {
     fontSize: 13,

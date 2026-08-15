@@ -231,6 +231,18 @@ export async function createJournalEntry(
   return res.json();
 }
 
+export async function deleteJournalEntry(entryId: string): Promise<void> {
+  const res = await fetch(
+`${API_URL}/journal/${entryId}`
+, {
+    method: "DELETE",
+    headers: await authHeaders(),
+  });
+  if (!res.ok) throw new Error(
+`Journal delete failed: ${res.status}`
+);
+}
+
 export async function listJournalEntries(): Promise<JournalEntry[]> {
   const res = await fetch(`${API_URL}/journal`, {
     headers: await authHeaders(),
@@ -354,5 +366,3 @@ export async function updateGoal(
   });
   if (!res.ok) throw new Error(`Goal update failed: ${res.status}`);
 }
-
-

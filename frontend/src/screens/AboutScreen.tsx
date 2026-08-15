@@ -30,7 +30,7 @@ export default function AboutScreen({ onBack }: { onBack: () => void }) {
   const { theme } = useTheme();
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.background }}>
+    <View style={{ flex: 1, backgroundColor: "transparent" }}>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={onBack} hitSlop={12}>
           <Text style={{ color: theme.accent, fontSize: 16 }}>‹ Back</Text>

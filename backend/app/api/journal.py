@@ -1,6 +1,6 @@
 """Journal endpoints (all require a valid Supabase JWT)."""
 import uuid
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.journal_reflector import generate_reflection
 from app.auth.dependencies import get_current_user_id
@@ -46,3 +46,16 @@ async def list_journal(
         )
         for e in entries
     ]
+
+
+@router.delete("/journal/{entry_id}")
+async def delete_entry(
+    entry_id: str,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    deleted = await repo.delete_entry(db, str(user_id), entry_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    await db.commit()
+    return {"ok": True}

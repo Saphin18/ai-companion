@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -20,6 +20,7 @@ type Props = {
   onOpenReminders: () => void;
   onOpenGoals: () => void;
   onOpenAbout: () => void;
+  onOpenWallpaper: () => void;
   onCollapse: () => void;
   activeView: string;
   refreshKey: number;
@@ -39,6 +40,7 @@ export default function WebSidebar({
   onOpenReminders,
   onOpenGoals,
   onOpenAbout,
+  onOpenWallpaper,
   onCollapse,
   activeView,
   refreshKey,
@@ -134,6 +136,7 @@ export default function WebSidebar({
         {navItem("alarm-outline", "Reminders", onOpenReminders, "reminders")}
         {navItem("flag-outline", "Goals", onOpenGoals, "goals")}
         {navItem("information-circle-outline", "About", onOpenAbout, "about")}
+        {navItem("color-palette-outline", "Wallpaper", onOpenWallpaper, "wallpaper")}
       </View>
 
       <View style={[styles.divider, { backgroundColor: theme.border }]} />
@@ -263,4 +266,3 @@ const styles = StyleSheet.create({
   profileName: { fontSize: 13, fontWeight: "500" },
   profileSub: { fontSize: 11 },
 });
-

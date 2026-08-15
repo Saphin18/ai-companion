@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -38,6 +38,7 @@ import JournalScreen from "./src/screens/JournalScreen";
 import RemindersScreen from "./src/screens/RemindersScreen";
 import GoalsScreen from "./src/screens/GoalsScreen";
 import AboutScreen from "./src/screens/AboutScreen";
+import WallpaperPickerScreen from "./src/screens/WallpaperPickerScreen";
 import WebSidebar from "./src/components/WebSidebar";
 
 type View3 =
@@ -47,7 +48,8 @@ type View3 =
   | { name: "journal" }
   | { name: "reminders" }
   | { name: "goals" }
-  | { name: "about" };
+  | { name: "about" }
+  | { name: "wallpaper" };
 
 type AuthView = "landing" | "signup" | "login";
 
@@ -224,7 +226,8 @@ function Root() {
         view.name === "journal" ||
         view.name === "reminders" ||
         view.name === "goals" ||
-        view.name === "about"
+        view.name === "about" ||
+        view.name === "wallpaper"
       ) {
         setView({ name: "list" });
         return true;
@@ -335,6 +338,8 @@ function Root() {
     content = <GoalsScreen onBack={() => setView({ name: "list" })} />;
   } else if (view.name === "about") {
     content = <AboutScreen onBack={() => setView({ name: "list" })} />;
+  } else if (view.name === "wallpaper") {
+    content = <WallpaperPickerScreen onBack={() => setView({ name: "list" })} />;
   } else if (view.name === "chat") {
     content = (
       <ChatScreen
@@ -359,6 +364,7 @@ function Root() {
         onOpenReminders={() => setView({ name: "reminders" })}
         onOpenGoals={() => setView({ name: "goals" })}
         onOpenAbout={() => setView({ name: "about" })}
+        onOpenWallpaper={() => setView({ name: "wallpaper" })}
       />
     );
   }
@@ -379,6 +385,7 @@ function Root() {
               onOpenReminders={() => setView({ name: "reminders" })}
               onOpenGoals={() => setView({ name: "goals" })}
               onOpenAbout={() => setView({ name: "about" })}
+              onOpenWallpaper={() => setView({ name: "wallpaper" })}
               onCollapse={() => setWebSidebarOpen(false)}
               activeView={view.name}
               refreshKey={webRefreshKey}
@@ -423,5 +430,3 @@ export default function App() {
     </ThemeProvider>
   );
 }
-
-
