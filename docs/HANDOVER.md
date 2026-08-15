@@ -3078,3 +3078,166 @@ const isDesktopWeb = IS_WEB && windowWidth >= 768;  // layout gating
 - **Auth screen props are now optional.** `initialSignUp` defaults to `false`,
   `onBack` defaults to `undefined` (no back arrow). Existing callers work
   without changes.
+
+# SECTION 21 — Session 21: Wallpaper picker, journal delete, profile cleanup, biometric fix (Aug 15, 2026)
+
+## 21.1 What was done
+
+1. **Wallpaper picker screen** — brand-new `WallpaperPickerScreen.tsx`.  Accessible from drawer (mobile hamburger menu) and `WebSidebar` (desktop web).  Contains:
+   - Light / Dark / System appearance toggle (same segmented control as Profile)
+   - "Choose from gallery" — picks an image with `expo-image-picker`, converts to base64 data URL, stores in AsyncStorage under key `custom_wallpaper`, rendered in `ThemeProvider` at 70 % opacity behind every screen
+   - Theme preset grid — shows all themes on APK, only "Saphin" default on web (`Platform.OS !== "web"` filter)
+   - "Reset to default" link when a non-default theme or custom wallpaper is active
+
+2. **Journal entry delete** — each past-entry card now has an ✕ button (top-right).  Tap shows "Are you sure?" confirmation (web: `window.confirm`, mobile: `Alert.alert`).  Optimistic UI — entry vanishes immediately, rolls back if the server returns an error.
+   - Backend: `DELETE /journal/{entry_id}` endpoint with user-ownership guard; hard delete (not soft — journal is not chat data, so rule 0.4's soft-delete mandate doesn't apply).
+   - Frontend: new `deleteJournalEntry(entryId)` in `api.ts`.
+
+3. **Profile screen cleanup** — removed the "Theme" label and `<ThemePicker />` component.  Profile now only shows the Appearance (Dark / Light / System) segmented control.  Theme cards live exclusively in the Wallpaper screen.
+
+4. **Biometric prompt fix** — `maybeOfferBiometric()` in `App.tsx` now writes `biometric_prompt_shown = "1"` to AsyncStorage on first display and skips every future launch.  Previously it fired on every sign-in, which was frustrating.
+
+5. **Transparent backgrounds** — every screen's root container changed from `backgroundColor: theme.background` to `backgroundColor: "transparent"` so the custom wallpaper (rendered in `ThemeProvider`) is visible everywhere.  App.tsx desktop row layout also made transparent.
+
+## 21.2 Files changed this session (full paths)
+
+### FRONTEND — new file
+| Path | Notes |
+|---|---|
+| `frontend/src/screens/WallpaperPickerScreen.tsx` | **NEW**.  Wallpaper picker screen. |
+
+### FRONTEND — modified
+| Path | What changed |
+|---|---|
+| `frontend/App.tsx` | +import `WallpaperPickerScreen`; View3 union +`"wallpaper"`; +route between about and chat; +`onOpenWallpaper` prop on `ChatsListScreen` and `WebSidebar`; +`"wallpaper"` in back-handler list; desktop row `backgroundColor` → `"transparent"`; `maybeOfferBiometric` stores AsyncStorage flag so it only fires once |
+| `frontend/src/screens/ChatsListScreen.tsx` | +`onOpenWallpaper` in Props type, destructured props, and drawer item (`🎨  Wallpaper`); container `backgroundColor` → `"transparent"` |
+| `frontend/src/components/WebSidebar.tsx` | +`onOpenWallpaper` in Props type, destructured props, and `navItem("color-palette-outline", "Wallpaper", …, "wallpaper")` |
+| `frontend/src/screens/JournalScreen.tsx` | +`deleteJournalEntry` import; +`Ionicons` import; +`deletingId` state; +`handleDelete` with confirm; +✕ button on each entry; container `backgroundColor` → `"transparent"` |
+| `frontend/src/screens/ProfileScreen.tsx` | −`import { ThemePicker } from "../theme/components"`; −Theme label; −`<ThemePicker />`; container `backgroundColor` → `"transparent"` |
+| `frontend/src/screens/ChatScreen.tsx` | container `backgroundColor` → `"transparent"` (two occurrences) |
+| `frontend/src/screens/RemindersScreen.tsx` | container `backgroundColor` → `"transparent"` |
+| `frontend/src/screens/GoalsScreen.tsx` | container `backgroundColor` → `"transparent"` |
+| `frontend/src/screens/AboutScreen.tsx` | container `backgroundColor` → `"transparent"` |
+| `frontend/src/services/api.ts` | +`deleteJournalEntry(entryId: string): Promise<void>` — `DELETE ${API_URL}/journal/${entryId}` with `await authHeaders()` |
+| `frontend/src/context/ThemeContext.tsx` | +`Image` import; +`CUSTOM_WP_KEY` const; +`customWp` state loaded from AsyncStorage; +`setCustomWallpaper` function; +context type & value updated; +`<View pointerEvents="none"><Image …opacity 0.7 /></View>` render layer.  **Imports use `"../theme/types"` and `"../theme/registry"`** (correct for `src/context/` location). |
+| `frontend/src/theme/ThemeContext.tsx` | Identical changes to context/ copy.  **Imports use `"./types"` and `"./registry"`** (correct for `src/theme/` location). |
+| `frontend/src/theme/registry.ts` | UNCHANGED — still exports `[defaultTheme, onePieceTheme, ...natureThemes]` |
+
+### BACKEND — modified
+| Path | What changed |
+|---|---|
+| `backend/app/api/journal.py` | +`import HTTPException`; +`DELETE /journal/{entry_id}` endpoint (ownership-guarded, hard delete, returns `{"ok": true}` or 404) |
+| `backend/app/repositories/journal_repository.py` | +`delete_entry(db, user_id, entry_id) → bool` — selects by id+user_id, deletes, flushes |
+
+## 21.3 Code contracts added/changed
+
+### Add to Section 3.6 (`api.ts` exports):
+```
+deleteJournalEntry(entryId: string): Promise<void>
+```
+
+### Add to Section 3.9 (`ChatsListScreen.tsx` props):
+```
+onOpenWallpaper: () => void;
+```
+
+### Add to Section 3.10 (View3 union):
+```typescript
+| { name: "wallpaper" };
+```
+
+### ThemeContext — new exports on `useTheme()` return type:
+```typescript
+customWallpaper: string | null;
+setCustomWallpaper: (uri: string | null) => void;
+```
+
+### AsyncStorage keys (new):
+```
+"custom_wallpaper"         — base64 data URL string, or absent
+"biometric_prompt_shown"   — "1" after first prompt, or absent
+```
+
+### Backend endpoint (new):
+```
+DELETE /journal/{entry_id}  →  { "ok": true }   (auth required, 404 if not found or not owned)
+```
+
+## 21.4 Bugs found and fixed this session (continuing Section 11 numbering)
+
+| # | Description | Cause | Fix |
+|---|---|---|---|
+| 81 | ThemeContext tsc errors (`Cannot find module './types'`) after copying to `src/context/` | File was written with `"./types"` imports but placed in `src/context/` where the path should be `"../theme/types"` | Adjusted imports per directory; both copies now have correct paths |
+| 82 | `pointerEvents` prop on `<Image>` — tsc error | RN `Image` doesn't accept `pointerEvents`; only `View` does | Wrapped `Image` in `<View pointerEvents="none">` |
+| 83 | `deleteJournalEntry` duplicated in `api.ts` — tsc "duplicate function" error | PowerShell `.Replace()` injected the function twice | Removed bad copy by line-number range |
+| 84 | `deleteJournalEntry` used `authHeaders()` without `await` — type error | Didn't check existing call-site pattern (`await authHeaders()`) | Added `await` |
+| 85 | Journal delete: entry reappears after deletion | Backend not deployed — old code has no DELETE endpoint, returns 404, frontend rolls back | Pushed backend changes, Render auto-deployed |
+| 86 | Custom wallpaper not visible on any screen | Every screen had `backgroundColor: theme.background` (solid) covering the wallpaper rendered in ThemeProvider underneath | Changed all screens + App.tsx desktop layout to `backgroundColor: "transparent"` |
+| 87 | Biometric "Enable quick unlock?" popup on every app launch | `maybeOfferBiometric()` had no memory of past prompts — ran on every `SIGNED_IN` event | Added AsyncStorage flag `biometric_prompt_shown`; function checks and skips if already set |
+
+## 21.5 CRITICAL — ThemeContext lives in TWO places
+
+```
+frontend/src/theme/ThemeContext.tsx      ← imports ./types, ./registry
+frontend/src/context/ThemeContext.tsx    ← imports ../theme/types, ../theme/registry
+```
+
+**Both files must stay in sync.**  They are identical except for the two import paths.  Bug #81 happened because we copied one to the other without adjusting paths.
+
+**Rule: when editing ThemeContext, ALWAYS update BOTH copies with correct import paths for each location.**
+
+## 21.6 Architecture decisions
+
+### D25 — Custom wallpaper storage
+Custom wallpaper stored as base64 data URL in AsyncStorage (key: `custom_wallpaper`).  On web, `FileReader.readAsDataURL` from blob.  On mobile, `expo-file-system.readAsStringAsync` with Base64 encoding.  Quality 0.3 via `expo-image-picker` to keep size manageable.  Rendered in `ThemeProvider` as `<Image … opacity={0.7} resizeMode="cover" />` inside a `<View pointerEvents="none">` wrapper.  All screen containers made transparent so the wallpaper shows through.
+
+### D26 — Web-only theme filter
+`WallpaperPickerScreen.tsx` filters `themes.filter(def => Platform.OS !== "web" || def.id === "default")`.  Registry (`src/theme/registry.ts`) unchanged — all themes still registered for APK.  Only the picker UI hides them on web.
+
+### D27 — Journal hard delete
+Journal entries are hard-deleted (not soft-deleted).  Rule 0.4's soft-delete mandate applies to chat data only.  Journal entries have no downstream references, so hard delete is safe.
+
+## 21.7 Commits this session
+
+```
+feat: wallpaper picker, journal delete, profile cleanup
+fix: transparent backgrounds for wallpaper visibility, web-only theme filter, opacity bump
+fix: biometric prompt shows once only
+```
+
+## 21.8 Still outstanding (carried from 20.7 + new)
+
+- 🔴 **Rotate Supabase DB password and `CRON_SECRET`** — flagged since Session 17, STILL not done
+- 🟠 Build a dev build (`eas build --profile development`) — saves build-cycle time
+- 🟡 Add FCM key to `production` EAS profile; delete stale Expo Go push token row
+- 🟡 Clear test attachment uploads from Supabase Storage
+- 🟡 Consider per-attachment summaries for multi-turn document discussion
+- 🟡 **Custom wallpaper on APK** — needs on-device testing.  expo-image-picker + expo-file-system base64 path is coded but untested on real device.  May be slow for large images — consider filesystem copy instead of base64 if performance is bad.
+- 🟡 **Navigation reset on sidebar switch** — clicking sidebar items (Journal → Wallpaper → Journal) passes through home.  Each back button does `setView({ name: "list" })`.  Not broken but adds an extra step on desktop web.
+- 🟢 App-wide wallpaper/theme picker — DONE (this session)
+- 🟢 Web Speech API fallback for `expo-speech` on web (TTS doesn't work in-browser)
+
+## 21.9 Rules from this session
+
+1. **ThemeContext has two copies** — always update both with correct import paths (see 21.5).
+2. **PowerShell `.Replace()` with template literals is dangerous** — `${}` gets expanded.  Use line-insertion by array index for JS template strings.
+3. **Check `await` on async helpers** — `authHeaders()` is async; every call site uses `await authHeaders()`.
+4. **Don't blind-replace across files** — verify every occurrence with `Select-String` first, then apply.
+5. **Backend must be deployed for new endpoints** — frontend optimistic UI will roll back if the server returns 404.  Always `git push` backend changes before testing.
+
+## 21.10 Amendments to earlier sections
+
+### Section 0.1 — update "where we are":
+Session 21 (Aug 15 2026) added wallpaper picker screen with custom gallery wallpaper, journal entry delete, removed ThemePicker from Profile, fixed biometric prompt to show once only.  APK build triggered.  Web deployed to Vercel.
+
+### Section 2 — add to project structure under `frontend/src/screens/`:
+```
+WallpaperPickerScreen.tsx   # Wallpaper picker (themes + custom gallery + appearance toggle)
+```
+
+### Section 3.10 — View3 union now includes `| { name: "wallpaper" }`.
+
+### Section 8 — Theme system:
+Custom wallpaper support added to ThemeContext (both copies).  New AsyncStorage key `custom_wallpaper`.  All screen containers changed to `backgroundColor: "transparent"`.  Nature themes hidden on web via Platform filter in WallpaperPickerScreen (registry unchanged).
+
+### Section 11 — append bugs #81–#87 (see 21.4).
