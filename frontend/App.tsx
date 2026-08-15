@@ -131,6 +131,7 @@ function Root() {
 
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const backgroundedAt = useRef<number>(0);
+  const wasAuthed = useRef(false);
 
   // --- Load Ionicons font for web (fixes empty-square icons on Vercel) ---
   useEffect(() => {
@@ -143,6 +144,7 @@ function Root() {
     supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session);
       if (data.session) {
+        wasAuthed.current = true;
         syncProfile(data.session, hydrateFromServer);
         syncPushToken();
         if (!IS_WEB) {
@@ -162,17 +164,26 @@ function Root() {
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
-      setView({ name: "list" });
       if (!s) {
-        // Reset to landing page on sign out
+        // Signed out -- go back to landing
+        wasAuthed.current = false;
+        setView({ name: "list" });
         setAuthView("landing");
+        return;
       }
-      if (s && event === "SIGNED_IN") {
+      if (event === "SIGNED_IN" && !wasAuthed.current) {
+        // Genuinely fresh login (not a tab-switch token recovery)
+        wasAuthed.current = true;
+        setView({ name: "list" });
         setLocked(false);
         syncProfile(s, hydrateFromServer);
         syncPushToken();
         maybeOfferBiometric();
+      } else if (event === "SIGNED_IN" && wasAuthed.current) {
+        // Tab-switch recovery -- keep session fresh, do NOT reset view
+        syncProfile(s, hydrateFromServer);
       }
+      // TOKEN_REFRESHED, USER_UPDATED, etc. -- just update the session
     });
     return () => sub.subscription.unsubscribe();
   }, []);
@@ -434,3 +445,7 @@ export default function App() {
     </ThemeProvider>
   );
 }
+
+
+
+
