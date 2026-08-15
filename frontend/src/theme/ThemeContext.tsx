@@ -174,7 +174,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           <View pointerEvents="none" style={StyleSheet.absoluteFill}>
             <Image
               source={{ uri: customWp }}
-              style={[StyleSheet.absoluteFill, { opacity: 0.4 }]}
+              style={[StyleSheet.absoluteFill, { opacity: 0.7 }]}
               resizeMode="cover"
             />
           </View>

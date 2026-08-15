@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -373,7 +373,7 @@ function Root() {
     return (
       <>
         {bar}
-        <View style={{ flexDirection: "row", flex: 1, backgroundColor: theme.background }}>
+        <View style={{ flexDirection: "row", flex: 1, backgroundColor: "transparent" }}>
           {webSidebarOpen && (
             <WebSidebar
               onOpenChat={(id) => {

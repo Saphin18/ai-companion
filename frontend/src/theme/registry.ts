@@ -1,4 +1,4 @@
-import { ThemeDefinition } from "./types";
+﻿import { ThemeDefinition } from "./types";
 import { defaultTheme } from "./themes/default";
 import { onePieceTheme } from "./themes/onePiece";
 import { natureThemes } from "./themes/nature";

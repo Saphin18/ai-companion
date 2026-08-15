@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -293,7 +293,7 @@ export default function WallpaperPickerScreen({ onBack }: Props) {
           Themes
         </Text>
         <View style={styles.grid}>
-          {themes.map((def) => {
+          {themes.filter((def) => Platform.OS !== "web" || def.id === "default").map((def) => {
             const isActive = def.id === themeId && !customWallpaper;
             const variant = theme.isDark ? def.dark : def.light;
             const hasWallpaper = !!variant.wallpaper;
