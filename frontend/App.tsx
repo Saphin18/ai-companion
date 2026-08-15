@@ -96,10 +96,14 @@ async function syncPushToken() {
 async function maybeOfferBiometric() {
   if (IS_WEB) return;
   try {
+    const AsyncStorage = (await import("@react-native-async-storage/async-storage")).default;
+    const alreadyAsked = await AsyncStorage.getItem("biometric_prompt_shown");
+    if (alreadyAsked) return;
     const available = await isBiometricAvailable();
     if (!available) return;
     const enabled = await isBiometricEnabled();
     if (enabled) return;
+    await AsyncStorage.setItem("biometric_prompt_shown", "1");
     Alert.alert(
       "Enable quick unlock?",
       "You can turn on fingerprint or face unlock anytime in Profile, under Security.",
