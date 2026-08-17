@@ -3,6 +3,7 @@ Groq-backed implementation of AIProvider.
 Groq exposes an OpenAI-compatible API, so we use the openai SDK pointed
 at Groq's endpoint. This is the ONLY file that talks to Groq directly.
 """
+import re
 from openai import AsyncOpenAI
 from app.ai.base import AIProvider
 from app.core.config import settings
@@ -58,5 +59,8 @@ class GroqProvider(AIProvider):
             max_tokens=1024,
             messages=messages,
         )
-        return response.choices[0].message.content
+        raw = response.choices[0].message.content or ""
+        return re.sub(r"<think>[\s\S]*?</think>\s*", "", raw).strip()
+
+
 
