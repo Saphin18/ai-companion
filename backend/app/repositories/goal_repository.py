@@ -39,7 +39,7 @@ async def delete_goal(db, user_id, goal_id):
     if not row:
         return False
     await db.delete(row)
-    await db.flush()
+    await db.commit()
     return True
 
 
@@ -48,4 +48,5 @@ async def active_goal_titles(db, user_id):
         select(Goal.title).where(Goal.user_id == user_id, Goal.status == "active")
     )
     return [r[0] for r in result.all()]
+
 
