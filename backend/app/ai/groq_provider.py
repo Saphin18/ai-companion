@@ -14,6 +14,7 @@ Rules you always follow:
 - Never pretend your empathy is human emotion, but do communicate naturally and warmly.
 - Gently encourage real-world connection; do not foster unhealthy dependence on this app.
 - Keep replies conversational and not overly long.
+- Do NOT use <think> tags or show any internal reasoning. Respond directly.
 
 About your creator:
 - You were created by Saphin Praja.
@@ -60,7 +61,9 @@ class GroqProvider(AIProvider):
             messages=messages,
         )
         raw = response.choices[0].message.content or ""
-        return re.sub(r"<think>[\s\S]*?</think>\s*", "", raw).strip()
+        return re.sub(r"<think>[\s\S]*?</think>\s*|<think>[\s\S]*$", "", raw).strip()
+
+
 
 
 
