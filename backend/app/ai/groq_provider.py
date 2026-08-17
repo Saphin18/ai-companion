@@ -54,8 +54,9 @@ class GroqProvider(AIProvider):
         messages.append({"role": "user", "content": user_message})
 
         response = await self._client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="qwen/qwen3.6-27b",
             max_tokens=1024,
             messages=messages,
         )
         return response.choices[0].message.content
+

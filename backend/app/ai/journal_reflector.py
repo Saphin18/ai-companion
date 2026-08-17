@@ -1,4 +1,4 @@
-"""
+﻿"""
 Writes a short, caring reflection on a user's journal entry using Groq.
 Best-effort: on failure it returns a gentle default so the entry still saves.
 """
@@ -21,14 +21,14 @@ Rules:
 
 _DEFAULT_REFLECTION = (
     "Thank you for writing this down. Whatever today held, it matters that you "
-    "took a moment for yourself — and I'm glad you did."
+    "took a moment for yourself â€” and I'm glad you did."
 )
 
 
 async def generate_reflection(entry_text: str) -> str:
     try:
         response = await _client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="qwen/qwen3.6-27b",
             max_tokens=200,
             temperature=0.7,
             messages=[

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Detects the USER's current emotional tone from their latest message using Groq.
 Best-effort: on any failure it returns None so chat/adaptation never breaks.
 """
@@ -27,7 +27,7 @@ anxious, angry, stressed, lonely, grateful.
 async def detect_mood(user_message: str) -> MoodReading | None:
     try:
         response = await _client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="qwen/qwen3.6-27b",
             max_tokens=120,
             temperature=0,
             response_format={"type": "json_object"},

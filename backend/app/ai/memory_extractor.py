@@ -1,4 +1,4 @@
-"""
+﻿"""
 Pulls durable personal facts out of a conversation turn using Groq.
 Best-effort: on any failure it returns an empty list so chat never breaks.
 """
@@ -38,7 +38,7 @@ async def extract_memories(
     )
     try:
         response = await _client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="qwen/qwen3.6-27b",
             max_tokens=500,
             temperature=0,
             response_format={"type": "json_object"},
