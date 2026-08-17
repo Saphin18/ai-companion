@@ -28,7 +28,7 @@ _DEFAULT_REFLECTION = (
 async def generate_reflection(entry_text: str) -> str:
     try:
         response = await _client.chat.completions.create(
-            model="qwen/qwen3.6-27b",
+            model="openai/gpt-oss-120b",
             max_tokens=200,
             temperature=0.7,
             messages=[
@@ -40,3 +40,4 @@ async def generate_reflection(entry_text: str) -> str:
         return text or _DEFAULT_REFLECTION
     except Exception:
         return _DEFAULT_REFLECTION
+

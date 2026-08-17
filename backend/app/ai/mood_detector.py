@@ -27,7 +27,7 @@ anxious, angry, stressed, lonely, grateful.
 async def detect_mood(user_message: str) -> MoodReading | None:
     try:
         response = await _client.chat.completions.create(
-            model="qwen/qwen3.6-27b",
+            model="openai/gpt-oss-120b",
             max_tokens=120,
             temperature=0,
             response_format={"type": "json_object"},
@@ -50,3 +50,4 @@ async def detect_mood(user_message: str) -> MoodReading | None:
         return MoodReading(mood=mood, intensity=intensity, note=note)
     except Exception:
         return None
+

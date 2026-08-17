@@ -56,12 +56,13 @@ class GroqProvider(AIProvider):
         messages.append({"role": "user", "content": user_message})
 
         response = await self._client.chat.completions.create(
-            model="qwen/qwen3.6-27b",
+            model="openai/gpt-oss-120b",
             max_tokens=1024,
             messages=messages,
         )
         raw = response.choices[0].message.content or ""
         return re.sub(r"<think>[\s\S]*?</think>\s*|<think>[\s\S]*$", "", raw).strip()
+
 
 
 

@@ -38,7 +38,7 @@ async def extract_memories(
     )
     try:
         response = await _client.chat.completions.create(
-            model="qwen/qwen3.6-27b",
+            model="openai/gpt-oss-120b",
             max_tokens=500,
             temperature=0,
             response_format={"type": "json_object"},
@@ -63,3 +63,4 @@ async def extract_memories(
         return results
     except Exception:
         return []
+

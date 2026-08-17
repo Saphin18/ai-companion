@@ -2,7 +2,7 @@
 from app.core.config import settings
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL = "qwen/qwen3.6-27b"
+MODEL = "openai/gpt-oss-120b"
 DEFAULT_LINE = "Hey, just thinking of you. How is your day going? I am here whenever you want to talk."
 
 
@@ -34,4 +34,5 @@ async def generate_checkin(goal_titles=None):
             return line or DEFAULT_LINE
     except Exception:
         return DEFAULT_LINE
+
 
