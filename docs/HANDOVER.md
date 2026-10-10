@@ -3419,3 +3419,529 @@ terminal commands.
     deleteGoal(id: string): Promise<void>
 
 ### Section 11 - append bugs #88-#92 (see 22.4).
+
+# SECTION 23 - Session 23: Lamplight warm redesign, typography, launch animation, friend-register AI, retired vision model (Oct 11, 2026)
+
+> **This is the NEWEST section. Read it first. It OVERRIDES earlier sections
+> where they conflict.**
+
+## 23.1 What was done
+
+Two separate pieces of work, plus a full read-through audit of the files no
+earlier session had opened.
+
+**A. Visual redesign (FRONTEND).** The owner asked whether the app's UI/UX was
+good enough for an international presentation. Honest answer given: no, not yet,
+and the reasons were specific rather than vague. The palette was cool throughout
+(`#0f1419` blue-black, `#7c6cf0` indigo, `#8b8ba7` lavender-grey), there was no
+typeface at all, almost no motion, and the home screen was ~60% empty on desktop.
+Three warm directions were built as standalone animated HTML samples and the
+owner chose "Lamplight".
+
+**B. AI personality (BACKEND).** The owner noticed replies were "too long... more
+likely AI rather than friends" and sent a screenshot of the companion answering
+"today is so boring day" with a numbered three-step framework and raw `**bold**`
+markdown. Root cause was prompt, not UI.
+
+**C. Audit.** The owner asked "did you analyse every file of this project?" The
+honest answer was no (~20 of ~70). A proper read-through followed and found the
+items in 23.5.
+
+## 23.2 The Lamplight palette (D28)
+
+Warmth is a hue-temperature property. It cannot be reached by adjusting opacity
+or radius - every hue in the old palette was blue-biased, so every hue was
+rotated warm. Both variants were contrast-checked to WCAG AA (4.5:1 body text).
+
+**Dark:** `background #15110e`, `surface #221b16`, `textPrimary #f6efe8` (16.7:1),
+`textSecondary #a89585` (6.6:1), `accent #e8956b` apricot (8.1:1),
+`accentText #241710` (7.5:1), `bubbleUser #a05939`, `bubbleUserText #fff6f0`
+(4.9:1), `bubbleCompanion #2a211b`, `danger #ef6b5e`.
+
+**Light:** `background #faf6f1`, `surface #ffffff`, `surfaceAlt #f1e9e0`,
+`textPrimary #2e2520` (14:1), `textSecondary #7a6b60` (4.8:1),
+`accent #ad5330` burnt sienna (4.8:1), `accentText #fff8f3` (4.9:1).
+
+**The two pairs with the least headroom are `bubbleUser` and `textSecondary`.
+Do not lighten either without re-checking contrast.** Both are commented inline.
+
+**Interaction with the custom wallpaper (D25) - verified, not assumed.**
+`ThemeContext` paints `theme.background`, then renders the user's gallery photo
+on top at `opacity: 0.7`. So 30% of `background` bleeds through every custom
+wallpaper. A warm ground now tints the user's own photo warm. The feature did
+not need reworking; it improved.
+
+## 23.3 Typography system (D29) - `frontend/src/theme/typography.ts` (NEW)
+
+Before this session every word in the app was Android's Roboto. `expo-font` was
+present only as `@expo/vector-icons`' peer dependency (mistake #48) and loaded
+nothing.
+
+- **Fraunces SemiBold** for display, **Figtree** Regular/SemiBold/Bold for
+  everything else. Four static per-weight TTFs, ~193 KB total.
+- **Zero new dependencies.** The TTFs were extracted from the
+  `@expo-google-fonts` packages with `npm install --no-save`, copied out, and
+  the packages removed. `package.json` gained no font entries.
+- **Files live in TWO places and must stay in sync:**
+  `frontend/assets/fonts/` (native, loaded by `expo-font`) and
+  `frontend/public/fonts/` (web, served unhashed by the static export).
+  Web gets an injected `@font-face` block in `App.tsx` - the same approach that
+  was the only one to survive bug #73. **Miss the `public/` copy and the font
+  silently falls back to system on the Vercel build only.**
+- **NEVER combine these families with `fontWeight`.** On Android a custom font
+  plus `fontWeight` either does nothing or renders a broken synthesised bold.
+  Weight comes from choosing the family. Every `fontWeight` was removed from
+  the styles converted so far.
+- Scale (1.25 ratio off 15px): `display 32 / h1 25 / h2 19 / title 16 /
+  body 15 / bodyStrong 15 / label 13 / caption 12 / button 16 / overline 11`.
+  This replaces six ad-hoc sizes that existed across Landing and Auth alone.
+
+**Converted so far:** `LandingScreen`, `ChatsListScreen` (greeting, drawer,
+recents), `WebSidebar`, `IntroScreen`.
+**Still on the system font:** `ChatScreen`, `ChatBubble`, `ChatInput`,
+`ProfileScreen`, `AuthScreen`, `Journal`, `Goals`, `Reminders`, `About`,
+`Wallpaper`, `Lock`. Chat bubbles looking unchanged is expected, not a bug.
+
+## 23.4 Launch animation (D30) - `frontend/src/components/IntroScreen.tsx` (NEW)
+
+"Orb bloom": the orb springs up from 0.3 scale while a ring of warm light
+expands past the screen edge and dissolves; the wordmark rises underneath.
+
+- Plays in the gap that **already existed** at launch (`!ready || !fontsReady`,
+  where a bare `ActivityIndicator` used to sit). It adds no waiting.
+- Built on RN's built-in `Animated`, `useNativeDriver: true`, **transform and
+  opacity only**. No new packages. `react-native-reanimated` was deliberately
+  NOT installed - no dev build exists, so each attempt would cost a 40-90 min
+  preview build, and it can lag cheap phones.
+- Three safeguards, all load-bearing:
+  1. `introDone` lives in `Root`'s state, so it plays **once per process** and
+     never replays on a biometric unlock or a web tab refocus.
+  2. Initialises to `IS_WEB`, so a browser reload never plays it.
+  3. `onDone()` fires **unconditionally** in the animation callback. A
+     half-faded intro that never clears would be the worst possible failure.
+- `INTRO_BG` (`#15110e`) **must match `app.json` -> `splash.backgroundColor`**
+  or the native splash flashes a different colour before the intro. Both were
+  changed from `#2a2350`, along with `adaptiveIcon.backgroundColor`.
+- **Never tested on a device.** It is web-skipped by design and there is no dev
+  build, so the APK from this session is its first real run.
+
+## 23.5 The AI now talks like a friend (BACKEND)
+
+The entire brevity instruction used to be one line - *"Keep replies
+conversational and not overly long."* `openai/gpt-oss-120b` ignores that.
+
+**`app/ai/groq_provider.py`:**
+- Concrete rules replace the vague one: 1-3 sentences by default, match their
+  length, **no markdown of any kind**, no advice unless asked (stated outright:
+  *"a friend does not answer 'today was boring' with a three-step plan"*), at
+  most one question, no pep-talk sign-offs, at most one emoji.
+- **Humour** is now explicit and expected in ordinary and good moments, and
+  dropped entirely the moment someone sounds genuinely upset.
+- **Quotes when low:** roughly one message in three, short, simple, widely
+  known. **Only quotes it is confident are real; if unsure of the author, say
+  the line with no name. Never invent an attribution.** A quote stands
+  *instead of* advice, never on top of it.
+- `FORMAT_REMINDER` is a module constant appended **last**, after the
+  personality and tone blocks, because instructions nearest the end carry the
+  most weight and those blocks pull back toward assistant mode.
+- `_clean()` now strips markdown as well as `<think>` tags - unwrapping
+  `**bold**` and `__underline__` and heading hashes while keeping the words.
+  Single asterisks and hyphens are deliberately left alone ("5-10 min",
+  "3 * 4" appear in ordinary prose). Unit-tested against the exact string from
+  the owner's screenshot.
+
+**`app/api/chat.py`:** `tone_context` now branches on `mood_detector`'s own
+vocabulary and intensity, so the register swing is explicit rather than guessed:
+- low moods (`sad anxious stressed lonely angry tired`) at intensity >= 3 -> no
+  jokes, stay with it, a simple line may fit at the end
+- same moods below 3 -> warm and easy, very light humour allowed
+- `happy excited grateful` -> be playful, tease, join in
+- otherwise -> relaxed and curious
+
+`MOTIVATOR` no longer says *"nudge them toward positive action with concrete,
+doable next steps"* - that was list bait. It now suggests ONE small thing in a
+sentence.
+
+**Verified live against the real prompt before shipping:**
+- *"today is so boring day"* -> "Boring, huh? Did you try convincing your coffee
+  to do a dance?"
+- *"I lost my grandmother last month..."* -> "I'm really sorry you're going
+  through this, it sounds like the grief is hitting you extra hard today.
+  'Those we love never truly leave us.'"
+- *"I finally finished my portfolio site..."* -> "Congrats, you're basically the
+  internet's newest design guru now."
+
+## 23.6 CRITICAL - gpt-oss-120b is a REASONING model
+
+Section 22 chose it because it has "no thinking tags". That is true of the
+**visible reply** - the reasoning comes back in a separate `reasoning` field, so
+nothing leaks into the bubble. But **the reasoning is billed against
+`max_tokens` before any visible text is produced.** Measured:
+
+| `max_tokens` | finish_reason | content |
+|---|---|---|
+| 20 | `length` | **EMPTY** - reasoning consumed the whole budget |
+| 100 | `length` | cut off mid-word |
+| 500 (no system prompt) | `length` | still truncated |
+
+**This session briefly lowered `max_tokens` to 500 and that was a mistake - it
+nearly reintroduced bug #92.** It is back at **1024**. Brevity comes from the
+prompt, never from this number. There is a comment on that line saying so.
+
+`reasoning_effort="low"` was added: reasoning drops from ~379 chars to ~23 and
+total completion tokens roughly 4x (126 -> 31) with no quality loss across sad,
+happy and neutral messages. On Groq's free tier that is directly fewer
+rate-limit problems and faster replies. **`"none"` is rejected by this model -
+only `low`/`medium`/`high`.** (`vision_reader` uses `"none"` on Qwen, which is
+a different model and does accept it.)
+
+## 23.7 CRITICAL - Groq retired the vision model, silently
+
+The owner asked about free models. Listing the account revealed **11 models,
+not the 15 Section 16.1 documents**, and `qwen/qwen3.6-27b` was gone.
+
+**Image reading had been silently broken in production.** `vision_reader`
+catches all exceptions and returns `None`, so an attached photo produced no
+error - the companion simply behaved as if no image had been sent.
+
+Fixed to **`qwen/qwen3.8-27b`**, verified with the Section 16.1 probe trick:
+sending a 1x1 PNG returned *"Image must have at least 32 pixels in each
+dimension"*, which only a model that decoded the image can say.
+**Note: the threshold is 32px now, not the 2px recorded in 16.1.**
+
+**Current account inventory (verified live, Oct 11 2026):**
+
+| Purpose | Model | Backup available |
+|---|---|---|
+| chat | `openai/gpt-oss-120b` | `openai/gpt-oss-20b` |
+| images | `qwen/qwen3.8-27b` | **NONE - only vision model on the account** |
+| voice | `whisper-large-v3-turbo` | `whisper-large-v3` |
+
+Also present: `allam-2-7b`, two `llama-prompt-guard-2` safety filters,
+`openai/gpt-oss-safeguard-20b`, two `canopylabs/orpheus` TTS models.
+
+**Listing the account does not require a working API call - but a listed model
+can still be wrong for the job. Probe it.** A `403 Forbidden` on the models
+endpoint is fixed by sending a browser User-Agent, exactly as with the Supabase
+JWKS fetch (mistake #7).
+
+**RECOMMENDED RECURRING CHECK:** ask a future session to re-check the Groq
+account against what the code uses. It takes one command and catches this class
+of silent breakage before a user does. This is now the second time Groq has
+retired a model out from under this project.
+
+## 23.8 Model names are now ONE setting (supersedes 22.5 rule 2)
+
+The model name used to be written out in five files. It is now in
+`app/core/config.py` as pydantic settings with defaults:
+
+```python
+groq_model: str = "openai/gpt-oss-120b"
+groq_vision_model: str = "qwen/qwen3.8-27b"
+groq_transcribe_model: str = "whisper-large-v3-turbo"
+```
+
+**Because they are settings, not constants, the next retirement is an env var
+in Render -> Environment plus a restart. No code change, no git push, no deploy
+wait while chat is down.** Env var names are the uppercase forms: `GROQ_MODEL`,
+`GROQ_VISION_MODEL`, `GROQ_TRANSCRIBE_MODEL`.
+
+**Choose a replacement carefully:** a reasoning model that emits `<think>`
+blocks breaks the chat reply path (bugs #91/#92). Probe before adopting.
+
+## 23.9 The fallback providers were never usable
+
+`api/chat.py` calls `generate_reply(message, history=, memory_context=,
+personality_context=, tone_context=)`. Both `claude_provider` and
+`gemini_provider` accepted **one argument**, and `base.py`'s ABC declared the
+one-argument signature too. Swapping `provider_factory` would have thrown
+`TypeError` on the first message. **D5's promise that swapping providers is a
+one-file change was false** - and Section 22's outage is exactly when it would
+have mattered.
+
+Fixed: the ABC now declares the real signature, both providers accept all four
+kwargs and use them, and both import `COMPANION_SYSTEM_PROMPT` and
+`FORMAT_REMINDER` from `groq_provider` so a swap keeps the same personality.
+Gemini's history is translated (`assistant` -> `model`).
+
+**Important context the owner supplied: Groq is used because it is FREE.**
+Claude costs money and Gemini's free tier was zero-quota in Nepal (mistakes #8,
+#9). So **neither fallback is usable today.** The real failover for this project
+is a different free Groq model (23.7/23.8), not a different provider. The
+provider fix is worth having, but it is not the insurance policy - it was
+over-weighted when first presented, and that was corrected.
+
+`claude-sonnet-4-6` was verified as still a current, valid model ID and left
+unchanged - picking a different model is a cost decision for the owner.
+
+## 23.10 Files changed this session
+
+### BACKEND - modified
+| Path | What changed |
+|---|---|
+| `app/ai/groq_provider.py` | new companion prompt (brevity, humour, quotes); `FORMAT_REMINDER` constant; `_clean()` strips markdown + think tags; `max_tokens` 1024; `reasoning_effort="low"`; model from settings |
+| `app/api/chat.py` | `tone_context` branches on mood + intensity; MOTIVATOR no longer asks for step lists |
+| `app/core/config.py` | +`groq_model`, +`groq_vision_model`, +`groq_transcribe_model` |
+| `app/ai/base.py` | ABC signature corrected to match reality; mistake #3's literal `'"'"'` corruption removed |
+| `app/ai/claude_provider.py` | accepts all four kwargs, shares the Groq prompt |
+| `app/ai/gemini_provider.py` | same, plus `assistant`->`model` history translation |
+| `app/ai/checkin_writer.py` `journal_reflector.py` `memory_extractor.py` `mood_detector.py` `transcriber.py` `vision_reader.py` | model name now from settings; vision_reader's stale `llama-3.3-70b` comment fixed |
+
+### FRONTEND - new
+| Path | Notes |
+|---|---|
+| `src/theme/typography.ts` | font families, `fontAssets`, the type scale |
+| `src/components/IntroScreen.tsx` | orb bloom launch animation |
+| `assets/fonts/*.ttf` (4) | native font files |
+| `public/fonts/*.ttf` (4) | web copies - must stay in sync with assets/ |
+
+### FRONTEND - modified
+| Path | What changed |
+|---|---|
+| `src/theme/themes/default/index.ts` | Lamplight palette, both variants |
+| `App.tsx` | `fontAssets` loaded; web `@font-face` block extended to 5 families; `introDone` state + intro gate before the spinner |
+| `app.json` | `splash.backgroundColor` and `adaptiveIcon.backgroundColor` `#2a2350` -> `#15110e` |
+| `src/screens/LandingScreen.tsx` | warm recolour + type scale |
+| `src/screens/AuthScreen.tsx` | warm recolour |
+| `src/screens/ChatsListScreen.tsx` | type scale on greeting, drawer, recents |
+| `src/components/WebSidebar.tsx` | type scale |
+| `package.json` / `package-lock.json` | `expo` and `expo-local-authentication` patch bump for 18/18 |
+
+## 23.11 Code contracts added/changed - ADD TO SECTION 3
+
+### Section 3.3 CORRECTION - `get_current_user_id` returns `str`, NOT `uuid.UUID`
+
+`auth/dependencies.py` is annotated `-> str` and returns `payload.get("sub")`.
+**FastAPI does not coerce `Depends()` results**, so despite every endpoint
+writing `user_id: uuid.UUID = Depends(get_current_user_id)`, the value is a
+`str` at runtime. It works because SQLAlchemy accepts strings for UUID columns
+and `str(user_id)` is a harmless no-op. **But Section 3.3 said `uuid.UUID`, and
+anyone trusting that and calling `user_id.hex` gets an `AttributeError`.** This
+is bug #41's class living inside the document written to prevent bug #41.
+
+### Section 3.8 - `ChatScreen.tsx` props (was 3, is 4)
+```ts
+sessionId: string | null;
+onBack: () => void;
+initialMessage?: string | null;
+initialAction?: "record" | "photo" | "document" | null;
+```
+
+### Section 3.9 - `ChatsListScreen.tsx` props (was 7, is 9)
+```ts
+onOpenChat, onStartChatWithMessage, onStartChatWithAction,
+onOpenProfile, onOpenJournal, onOpenReminders, onOpenGoals,
+onOpenAbout, onOpenWallpaper
+```
+`onStartChatWithAction` had never been in Section 3 at all - only in 18.3 prose.
+
+### Section 3.10 - `View3` union (8 variants)
+```ts
+| { name: "list" }
+| { name: "chat"; sessionId: string | null;
+    initialMessage?: string | null;
+    initialAction?: "record" | "photo" | "document" | null }
+| { name: "profile" } | { name: "journal" } | { name: "reminders" }
+| { name: "goals" }   | { name: "about" }   | { name: "wallpaper" }
+```
+
+### Section 3.11 (NEW) - `WebSidebar.tsx` props - had no entry at all
+```ts
+onOpenChat, onOpenProfile, onOpenJournal, onOpenReminders,
+onOpenGoals, onOpenAbout, onOpenWallpaper, onCollapse,
+activeView: string, refreshKey: number
+```
+
+### Section 3.12 (NEW) - `IntroScreen.tsx` props
+```ts
+canFinish: boolean;   // true once ready && fontsReady
+onDone: () => void;   // always fires, even on an interrupted animation
+```
+
+### Section 3.13 (NEW) - `typography.ts` exports
+```ts
+fonts: { display, regular, medium, bold }   // family-name strings
+fontAssets: Record<string, number>          // require()d TTFs for expo-font
+type: { display h1 h2 title body bodyStrong label caption button overline }
+```
+
+### `AIProvider.generate_reply` - the real signature
+```python
+async def generate_reply(
+    self, user_message: str, *,
+    history: list[dict] | None = None,
+    memory_context: str | None = None,
+    personality_context: str | None = None,
+    tone_context: str | None = None,
+) -> str
+```
+
+## 23.12 Bugs found and fixed (continuing Section 22's numbering)
+
+| # | Description | Cause | Status |
+|---|---|---|---|
+| 93 | Replies read as an assistant, not a friend - numbered plans, unsolicited advice | the only brevity rule was "not overly long"; gpt-oss-120b ignores vague instructions | FIXED |
+| 94 | Raw `**asterisks**` visible in chat bubbles | model emitted markdown; ChatBubble renders plain text and nothing stripped it | FIXED (prompt + `_clean()`) |
+| 95 | **Image reading silently broken in production** | Groq retired `qwen/qwen3.6-27b`; `vision_reader` swallows the error and returns None | FIXED -> qwen3.8-27b |
+| 96 | Claude and Gemini providers could never have been used as fallback | ABC and both providers took 1 arg; chat.py passes 5 | FIXED |
+| 97 | Empty / truncated replies at low `max_tokens` | gpt-oss-120b bills reasoning against max_tokens before writing | FIXED (1024 + effort=low) |
+| 98 | **System appearance mode gives every new user the LIGHT theme** | `app.json` `userInterfaceStyle: "light"` forces `useColorScheme()` to "light"; default mode is "system" | **FOUND, NOT FIXED** |
+| 99 | Landing and Auth stayed purple after the palette change | both bypass theme tokens entirely with hardcoded colours - violates rule 3.4 | FIXED (recoloured; still not tokenised) |
+| 100 | Section 3.3 documents the wrong return type for `get_current_user_id` | FastAPI doesn't coerce `Depends()` results | DOC FIXED (23.11) |
+| 101 | **A deleted account keeps receiving daily check-in pushes forever** | `delete_account` removes only the Supabase auth user; the `profiles` row keeps `checkin_enabled=true` and `push_tokens` survive, and `run-checkins` iterates profiles | **FOUND, NOT FIXED** |
+| 102 | Stale push tokens are never detected | `send_push` returns `r.status_code == 200`, but Expo returns 200 with a per-ticket `DeviceNotRegistered` error in the body that is never read | **FOUND, NOT FIXED** |
+| 103 | `storage.remove()` is dead code with a misleading docstring claiming it runs on account deletion - it never does; attachment files are never deleted | - | **FOUND, NOT FIXED** |
+| 104 | `vercel dist --prod --yes` created a stray Vercel project named `dist` instead of deploying to `saphinai` | `--yes` auto-accepts project creation rather than prompting to link | FIXED (relinked); **stray `dist` project still exists and should be deleted** |
+
+## 23.13 flush() vs commit() audit - COMPLETE, no second occurrence
+
+Section 22.5 said this was "worth an audit of other repositories". Done.
+
+`get_db` does **not** commit - it only yields the session. The codebase runs
+**two conventions**, and both are currently correct:
+
+| Convention | Repositories | Who commits |
+|---|---|---|
+| repo commits internally | attachment, checkin, goal, push, reminder | the repo |
+| repo flushes, endpoint commits | chat, journal, profile | the endpoint |
+
+Every flush-only function (`create_session`, `update_session`, `hide_session`,
+`add_message`, `add_entry`, `delete_entry`, `update_profile_fields`) was traced
+to a committing caller. The soft-delete path was checked specifically
+(`chat.py:343`) because rule 0.4 #1 makes it the most critical write.
+
+**No second instance of bug #89.** But the split convention is exactly the trap
+that produced it: add an endpoint that calls `chat_repository` and forget to
+commit, and you get a silent write loss returning 200 OK. **Worth
+standardising on one convention.**
+
+## 23.14 Other audit findings not yet acted on
+
+- **CORS**: `allow_origins=["*"]` with `allow_credentials=True` is an invalid
+  combination browsers reject. Harmless only because auth is Bearer-token, not
+  cookie-based.
+- `goals.py update_goal` and `reminders.py delete_reminder` always return
+  `{"ok": true}`, never 404 - inconsistent with journal/goal delete.
+- `AttachmentOut.extracted_text` ships the full document text (3 KB+ per PDF)
+  to the client on every history load, though only the voice transcript is ever
+  displayed.
+- `sendChatWithAttachments` does not retry on 401 although `uploadAttachment`
+  does.
+- Attachment files are written to storage **before** the DB row, so a repo
+  failure orphans the file in the bucket.
+- `MemoryOut` still uses deprecated Pydantic v1 `class Config`.
+- Dead `isDesktopWeb` branching in `App.tsx` - both branches of the landing and
+  auth blocks are byte-identical.
+- Home `(+)` on web uses `window.confirm("OK = Photo / Cancel = Document")`,
+  which has no real cancel. Section 20.1 #6's `pickFileWeb()` fix applies to
+  `ChatInput` only, not the home bar.
+- `ChatBubble`'s doc chip border is hardcoded `rgba(255,255,255,0.25)` - nearly
+  invisible in light mode.
+- Theme-token violations by file: `AuthScreen` 27, `LandingScreen` 16,
+  `ProfileScreen` 6, `IntroScreen` 5, `ChatBubble` 4.
+
+## 23.15 Deployment this session
+
+**Backend:** pushed to `main`, Render auto-deployed. `/health` returned
+`{"status":"ok"}` after. Backend-only, so the new personality and the vision fix
+reached BOTH web and the existing APK with no rebuild.
+
+**Web:** `npx expo export --platform web` then deployed to Vercel. All five
+fonts verified present in `dist/fonts/` unhashed and serving 200 from
+`saphinai.vercel.app/fonts/...` live.
+
+> **WARNING for the next session: do NOT run `vercel dist --prod --yes`.**
+> The `--yes` flag creates a new project named after the directory instead of
+> prompting. It produced a stray project called `dist`. The correct sequence if
+> `dist/.vercel` is missing:
+> ```powershell
+> cd frontend\dist
+> vercel link --yes --project saphinai
+> vercel deploy --prod
+> ```
+> Confirm `.vercel/project.json` says `"projectName":"saphinai"` before deploying.
+
+**APK:** `eas build -p android --profile preview` started after
+`npx tsc --noEmit` (clean) and `npx expo-doctor` (**18/18**, achieved by bumping
+`expo` and `expo-local-authentication`). Result not confirmed at the time this
+section was written.
+
+## 23.16 Test checklist for the new APK
+
+Nothing visual in this session has run on a real device. In addition to
+re-confirming 18.9 and 19.6:
+
+1. **Launch animation** - cold-start the app. Orb blooms, wordmark rises, hands
+   off to the home screen. No purple flash before it.
+2. **It plays only once** - lock with fingerprint, unlock. The intro must NOT
+   replay.
+3. **It never sticks** - on a slow or offline start, the intro still clears.
+4. **Fonts render** - the greeting should be Fraunces (a serif), not Roboto. If
+   everything is still Roboto, the native font load failed.
+5. **No fake bold** - headings should look properly weighted, not smeared.
+6. **Warm palette everywhere** - landing, auth, home, chat, profile.
+7. **Light mode** - Profile -> Appearance -> Light. Check readability,
+   especially your own chat bubbles.
+8. **Chat register** - send "today is so boring day". Expect one or two warm,
+   funny sentences. No numbered list, no `**asterisks**`.
+9. **Sad register** - send something genuinely low. Expect acknowledgement, no
+   jokes, and sometimes a short simple quote.
+10. **Images work again** - attach a photo and ask about it. This was silently
+    broken before today.
+
+## 23.17 Still outstanding (carried from 22.6 + new)
+
+- RED: **Rotate Supabase DB password and `CRON_SECRET`** - flagged since
+  Session 17, deliberately deferred by the owner again.
+- RED NEW: **#98** `userInterfaceStyle: "light"` - every new user gets the light
+  theme regardless of their phone. One word in `app.json`, but it changes what
+  existing "System" users see, so it needs an explicit decision.
+- ORANGE: **Build a dev build** (`eas build --profile development`). Still the
+  highest-leverage unaddressed workflow change, and this session's launch
+  animation is untestable without one.
+- ORANGE NEW: **#101** deleted accounts keep getting check-in pushes. Rule 0.4
+  forbids deleting chat data, but nothing requires keeping `checkin_enabled` or
+  push tokens. Needs an owner decision.
+- YELLOW NEW: **#102** `send_push` never reads Expo's ticket errors, so stale
+  tokens accumulate forever (relates to 15.7).
+- YELLOW NEW: **#103** `storage.remove()` is dead code; attachment files are
+  never deleted from the bucket.
+- YELLOW NEW: delete the stray `dist` Vercel project.
+- YELLOW NEW: finish the typography rollout (11 screens still on Roboto).
+- YELLOW NEW: consider `reasoning_effort="low"` for `mood_detector`,
+  `memory_extractor`, `journal_reflector` and `checkin_writer` too - it would
+  cut free-tier token use further. **Not done because `mood_detector` requests
+  strict JSON and lower reasoning might hurt that. Test before adopting.**
+- YELLOW: FCM key on the `production` EAS profile; stale Expo Go push token row;
+  test attachment uploads still in Supabase Storage; per-attachment summaries;
+  custom wallpaper untested on APK; desktop-web navigation reset.
+- GREEN: warm palette, typography, launch animation, friend-register AI,
+  vision model fix, model-name centralisation - all DONE this session.
+
+## 23.18 Rules from this session
+
+1. **A listed model is not a working model.** Groq's model list showed 11
+   entries; the one the code needed was absent. Probe what you actually use,
+   the way you actually use it - "it appears in the list" is not a test.
+2. **A reasoning model bills its reasoning against `max_tokens`.** Lowering
+   that number to "keep replies short" produces empty or truncated replies.
+   Control length from the prompt; keep the token ceiling generous.
+3. **Vague prompt instructions lose to a model's defaults.** "Not overly long"
+   did nothing for two sessions. "1-3 sentences, no lists, no markdown, no
+   advice unless asked" worked immediately.
+4. **Warmth is hue temperature.** It cannot be reached through opacity, radius
+   or spacing. If every token is blue-biased, the design reads cool no matter
+   what else changes.
+5. **Check which screens actually read the theme.** Landing and Auth stayed
+   purple through a full palette change because they never used tokens. A
+   grep for colour literals finds these in seconds.
+6. **Never use `fontWeight` with a custom font family on Android.** Load one
+   family per weight instead.
+7. **`--yes` on a deploy command is not a convenience.** On Vercel it silently
+   created a new project rather than prompting. Read what a confirmation flag
+   is actually confirming.
+8. **FastAPI does not coerce `Depends()` return values** to the parameter's
+   type annotation. The annotation is documentation, not validation.
+9. **When the owner says they do not understand, stop explaining and start
+   verifying.** The useful response to "just make sure it's correct" is
+   evidence - git history, probe output, a passing check - not more prose.
