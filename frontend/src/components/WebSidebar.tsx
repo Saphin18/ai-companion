@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { getProfile, listSessions, SessionSummary } from "../services/api";
+import { getProfile, listSessions, renameSession, setSessionPinned, removeSession, SessionSummary } from "../services/api";
 import { supabase } from "../services/supabase";
 import { useTheme } from "../context/ThemeContext";
 
@@ -48,6 +48,7 @@ export default function WebSidebar({
   const { theme } = useTheme();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [initial, setInitial] = useState("?");
@@ -73,6 +74,49 @@ export default function WebSidebar({
       }
     })();
   }, [refreshKey]);
+
+  const handlePin = async (item: SessionSummary) => {
+    const next = !item.pinned;
+    setSessions((prev) =>
+      sortSessions(prev.map((s) => (s.id === item.id ? { ...s, pinned: next } : s)))
+    );
+    try {
+      await setSessionPinned(item.id, next);
+    } catch {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === item.id ? { ...s, pinned: item.pinned } : s))
+      );
+    }
+    setMenuFor(null);
+  };
+
+  const handleRename = async (item: SessionSummary) => {
+    setMenuFor(null);
+    const title = window.prompt("Rename chat", item.title || "");
+    if (title === null || !title.trim()) return;
+    setSessions((prev) =>
+      sortSessions(prev.map((s) => (s.id === item.id ? { ...s, title: title.trim() } : s)))
+    );
+    try {
+      await renameSession(item.id, title.trim());
+    } catch {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === item.id ? { ...s, title: item.title } : s))
+      );
+    }
+  };
+
+  const handleRemove = async (item: SessionSummary) => {
+    setMenuFor(null);
+    if (!window.confirm("Remove this chat from your list?")) return;
+    const backup = [...sessions];
+    setSessions((prev) => prev.filter((s) => s.id !== item.id));
+    try {
+      await removeSession(item.id);
+    } catch {
+      setSessions(backup);
+    }
+  };
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
@@ -158,29 +202,53 @@ export default function WebSidebar({
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ paddingBottom: 10 }}
             renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.chatRow}
-                onPress={() => onOpenChat(item.id)}
-              >
-                <Ionicons
-                  name="chatbubble-outline"
-                  size={14}
-                  color={theme.textSecondary}
-                  style={{ marginRight: 8, marginTop: 2 }}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={[styles.chatTitle, { color: theme.textPrimary }]}
-                    numberOfLines={1}
+              <View>
+                <TouchableOpacity
+                  style={styles.chatRow}
+                  onPress={() => { setMenuFor(null); onOpenChat(item.id); }}
+                >
+                  <Ionicons
+                    name="chatbubble-outline"
+                    size={14}
+                    color={theme.textSecondary}
+                    style={{ marginRight: 8, marginTop: 2 }}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[styles.chatTitle, { color: theme.textPrimary }]}
+                      numberOfLines={1}
+                    >
+                      {item.pinned ? "\uD83D\uDCCC " : ""}
+                      {item.title || "New chat"}
+                    </Text>
+                    <Text style={[styles.chatDate, { color: theme.textSecondary }]}>
+                      {formatDate(item.updated_at)}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setMenuFor(menuFor === item.id ? null : item.id)}
+                    hitSlop={6}
+                    style={{ padding: 4 }}
                   >
-                    {item.pinned ? "\uD83D\uDCCC " : ""}
-                    {item.title || "New chat"}
-                  </Text>
-                  <Text style={[styles.chatDate, { color: theme.textSecondary }]}>
-                    {formatDate(item.updated_at)}
-                  </Text>
-                </View>
-              </TouchableOpacity>
+                    <Ionicons name="ellipsis-horizontal" size={16} color={theme.textSecondary} />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+                {menuFor === item.id && (
+                  <View style={[styles.dropdown, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                    <TouchableOpacity style={styles.dropdownItem} onPress={() => handlePin(item)}>
+                      <Text style={{ color: theme.textPrimary, fontSize: 13 }}>
+                        {item.pinned ? "Unpin" : "Pin"}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.dropdownItem} onPress={() => handleRename(item)}>
+                      <Text style={{ color: theme.textPrimary, fontSize: 13 }}>Rename</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.dropdownItem} onPress={() => handleRemove(item)}>
+                      <Text style={{ color: "#e74c3c", fontSize: 13 }}>Remove</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
             )}
           />
         )}
@@ -246,6 +314,18 @@ const styles = StyleSheet.create({
   },
   chatTitle: { fontSize: 13 },
   chatDate: { fontSize: 11, marginTop: 2 },
+  dropdown: {
+    borderWidth: 1,
+    borderRadius: 8,
+    marginLeft: 34,
+    marginTop: 2,
+    marginBottom: 4,
+    paddingVertical: 4,
+  },
+  dropdownItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
   profile: {
     flexDirection: "row",
     alignItems: "center",
@@ -266,3 +346,8 @@ const styles = StyleSheet.create({
   profileName: { fontSize: 13, fontWeight: "500" },
   profileSub: { fontSize: 11 },
 });
+
+
+
+
+
