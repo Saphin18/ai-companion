@@ -1,8 +1,8 @@
-﻿import httpx
+import httpx
 from app.core.config import settings
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL = "openai/gpt-oss-120b"
+MODEL = settings.groq_model
 DEFAULT_LINE = "Hey, just thinking of you. How is your day going? I am here whenever you want to talk."
 
 

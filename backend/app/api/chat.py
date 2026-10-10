@@ -32,9 +32,10 @@ HISTORY_LIMIT = 20
 # Personality-mode instruction blocks (Phase 3B). "balanced" adds nothing.
 PERSONALITY_PROMPTS = {
     "motivator": (
-        "Personality mode: MOTIVATOR. Be upbeat and encouraging. Cheer the user on, "
-        "highlight their strengths and progress, and nudge them toward positive action "
-        "with concrete, doable next steps. Stay realistic and never dismiss their feelings."
+        "Personality mode: MOTIVATOR. Be upbeat and encouraging. Cheer the user on and "
+        "highlight their strengths and progress. If a nudge fits, suggest ONE small next "
+        "thing in a sentence - never a list or a plan. Stay realistic and never dismiss "
+        "their feelings."
     ),
     "humor": (
         "Personality mode: HUMOR. Be playful, warm and lightly witty. Add gentle jokes or "
@@ -170,11 +171,39 @@ async def chat(
     mood_reading = await detect_mood(message_text)
     tone_context = None
     if mood_reading:
+        # Mood words come from mood_detector's fixed vocabulary. The register
+        # swing between banter and quiet presence is the whole point of the
+        # companion, so the mood decides it explicitly rather than leaving the
+        # model to guess.
+        low = {"sad", "anxious", "stressed", "lonely", "angry", "tired"}
+        up = {"happy", "excited", "grateful"}
+        if mood_reading.mood in low and mood_reading.intensity >= 3:
+            register = (
+                "They are genuinely low right now. No jokes, no teasing, no silver "
+                "linings. Acknowledge the specific thing they said and stay with it. "
+                "A short, simple, widely known line may fit at the end if it lands "
+                "naturally - but only if you are not also giving advice, and not if "
+                "you used one recently."
+            )
+        elif mood_reading.mood in low:
+            register = (
+                "They sound a little off, not seriously upset. Be warm and easy. "
+                "Very light humour is fine if it clearly fits, but lead with "
+                "actually hearing them."
+            )
+        elif mood_reading.mood in up:
+            register = (
+                "They are in good spirits. Be playful and funny here - match their "
+                "energy, join in, tease a little. This is where your humour belongs."
+            )
+        else:
+            register = (
+                "Nothing strong either way. Talk like a friend catching up - relaxed, "
+                "curious, funny where it fits naturally."
+            )
         tone_context = (
             f"The user's current emotional tone seems to be '{mood_reading.mood}' "
-            f"(intensity {mood_reading.intensity}/5). Naturally adapt your warmth and "
-            "energy to match - be gentler and reassuring if they seem low, anxious, "
-            "sad or stressed; match their energy if they're upbeat or excited. "
+            f"(intensity {mood_reading.intensity}/5). {register} "
             "Never state or imply that you detected their mood."
         )
 

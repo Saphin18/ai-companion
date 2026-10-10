@@ -1,11 +1,11 @@
-﻿"""
+"""
 Speech-to-text via Groq Whisper.
 Best-effort: any failure returns None so the caller can carry on.
 """
 from openai import AsyncOpenAI
 from app.core.config import settings
 
-MODEL = "whisper-large-v3-turbo"
+MODEL = settings.groq_transcribe_model
 MAX_BYTES = 20 * 1024 * 1024   # Groq caps uploads; speech audio is far smaller
 
 _client = AsyncOpenAI(

@@ -1,7 +1,7 @@
-﻿"""
+"""
 Image -> short text description via Groq's Qwen vision model.
 
-Your chat model (llama-3.3-70b-versatile) is text-only, so images are
+The chat model is text-only, so images are
 converted to text HERE and then injected like any other context.
 Best-effort: any failure returns None.
 """
@@ -10,7 +10,7 @@ import re
 from openai import AsyncOpenAI
 from app.core.config import settings
 
-MODEL = "qwen/qwen3.6-27b"
+MODEL = settings.groq_vision_model
 MAX_BYTES = 8 * 1024 * 1024
 
 PROMPT = (

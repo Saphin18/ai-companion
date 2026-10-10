@@ -1,4 +1,4 @@
-﻿"""
+"""
 Pulls durable personal facts out of a conversation turn using Groq.
 Best-effort: on any failure it returns an empty list so chat never breaks.
 """
@@ -38,7 +38,7 @@ async def extract_memories(
     )
     try:
         response = await _client.chat.completions.create(
-            model="openai/gpt-oss-120b",
+            model=settings.groq_model,
             max_tokens=500,
             temperature=0,
             response_format={"type": "json_object"},

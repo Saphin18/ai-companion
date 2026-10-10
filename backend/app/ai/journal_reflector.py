@@ -1,4 +1,4 @@
-﻿"""
+"""
 Writes a short, caring reflection on a user's journal entry using Groq.
 Best-effort: on failure it returns a gentle default so the entry still saves.
 """
@@ -28,7 +28,7 @@ _DEFAULT_REFLECTION = (
 async def generate_reflection(entry_text: str) -> str:
     try:
         response = await _client.chat.completions.create(
-            model="openai/gpt-oss-120b",
+            model=settings.groq_model,
             max_tokens=200,
             temperature=0.7,
             messages=[
