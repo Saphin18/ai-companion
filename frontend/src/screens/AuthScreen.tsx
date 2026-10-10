@@ -248,7 +248,7 @@ export default function AuthScreen({ initialSignUp = false, onBack }: Props) {
 
   return (
     <LinearGradient
-      colors={["#2a2350", "#3b2f63", "#1a1730"]}
+      colors={["#26190f", "#3a2417", "#15110e"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
@@ -268,7 +268,7 @@ export default function AuthScreen({ initialSignUp = false, onBack }: Props) {
           >
             {onBack && (
               <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-                <Ionicons name="arrow-back" size={22} color="#c9c6e0" />
+                <Ionicons name="arrow-back" size={22} color="#cbb8a8" />
               </TouchableOpacity>
             )}
             <View style={styles.brand}>
@@ -295,7 +295,7 @@ export default function AuthScreen({ initialSignUp = false, onBack }: Props) {
                   value={fullName}
                   onChangeText={setFullName}
                   placeholder="Full name"
-                  placeholderTextColor="#8b8ba7"
+                  placeholderTextColor="#a89585"
                   autoCapitalize="words"
                   returnKeyType="next"
                   onSubmitEditing={() => emailRef.current?.focus()}
@@ -308,7 +308,7 @@ export default function AuthScreen({ initialSignUp = false, onBack }: Props) {
                 value={email}
                 onChangeText={setEmail}
                 placeholder="Email"
-                placeholderTextColor="#8b8ba7"
+                placeholderTextColor="#a89585"
                 autoCapitalize="none"
                 keyboardType="email-address"
                 returnKeyType="next"
@@ -323,7 +323,7 @@ export default function AuthScreen({ initialSignUp = false, onBack }: Props) {
                   value={password}
                   onChangeText={setPassword}
                   placeholder="Password"
-                  placeholderTextColor="#8b8ba7"
+                  placeholderTextColor="#a89585"
                   secureTextEntry={!showPassword}
                   returnKeyType={isSignUp ? "next" : "done"}
                   onSubmitEditing={() =>
@@ -349,7 +349,7 @@ export default function AuthScreen({ initialSignUp = false, onBack }: Props) {
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
                     placeholder="Confirm password"
-                    placeholderTextColor="#8b8ba7"
+                    placeholderTextColor="#a89585"
                     secureTextEntry={!showPassword}
                     returnKeyType="done"
                     onSubmitEditing={handleSubmit}
@@ -383,7 +383,7 @@ export default function AuthScreen({ initialSignUp = false, onBack }: Props) {
                   disabled={loading}
                 >
                   {loading ? (
-                    <ActivityIndicator color="#fff" />
+                    <ActivityIndicator color="#241710" />
                   ) : (
                     <Text style={styles.buttonText}>Sign up</Text>
                   )}
@@ -396,7 +396,7 @@ export default function AuthScreen({ initialSignUp = false, onBack }: Props) {
                     disabled={loading}
                   >
                     {loading ? (
-                      <ActivityIndicator color="#fff" />
+                      <ActivityIndicator color="#241710" />
                     ) : (
                       <Text style={styles.buttonText}>Log in</Text>
                     )}
@@ -408,7 +408,7 @@ export default function AuthScreen({ initialSignUp = false, onBack }: Props) {
                       onPress={handleBiometricLogin}
                       disabled={loading}
                     >
-                      <Ionicons name="finger-print" size={28} color="#a99cf5" />
+                      <Ionicons name="finger-print" size={28} color="#e8956b" />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -444,38 +444,38 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: "#a99cf5",
+    backgroundColor: "#e8956b",
     marginBottom: 18,
-    shadowColor: "#a99cf5",
+    shadowColor: "#e8956b",
     shadowOpacity: 0.6,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 0 },
   },
-  appName: { color: "#fff", fontSize: 28, fontWeight: "700" },
+  appName: { color: "#f6efe8", fontSize: 28, fontWeight: "700" },
   tagline: {
-    color: "#c9c6e0",
+    color: "#cbb8a8",
     fontSize: 15,
     marginTop: 8,
     textAlign: "center",
     paddingHorizontal: 20,
   },
   card: {
-    backgroundColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "rgba(255,232,214,0.07)",
     borderRadius: 22,
     padding: 24,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,232,214,0.14)",
   },
   cardTitle: {
-    color: "#fff",
+    color: "#f6efe8",
     fontSize: 19,
     fontWeight: "600",
     marginBottom: 20,
     textAlign: "center",
   },
   input: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    color: "#fff",
+    backgroundColor: "rgba(255,232,214,0.10)",
+    color: "#f6efe8",
     borderRadius: 14,
     padding: 15,
     fontSize: 16,
@@ -484,24 +484,24 @@ const styles = StyleSheet.create({
   passwordRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(255,232,214,0.10)",
     borderRadius: 14,
     marginBottom: 14,
     paddingRight: 6,
   },
-  passwordInput: { flex: 1, color: "#fff", padding: 15, fontSize: 16 },
+  passwordInput: { flex: 1, color: "#f6efe8", padding: 15, fontSize: 16 },
   toggle: { paddingHorizontal: 12, paddingVertical: 8 },
-  toggleText: { color: "#a99cf5", fontSize: 14, fontWeight: "600" },
+  toggleText: { color: "#e8956b", fontSize: 14, fontWeight: "600" },
   forgotWrap: {
     alignSelf: "flex-end",
     marginTop: -2,
     marginBottom: 14,
     paddingVertical: 4,
   },
-  forgotText: { color: "#a99cf5", fontSize: 14, fontWeight: "600" },
+  forgotText: { color: "#e8956b", fontSize: 14, fontWeight: "600" },
   loginRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
   button: {
-    backgroundColor: "#7c6cf0",
+    backgroundColor: "#e8956b",
     borderRadius: 14,
     padding: 16,
     alignItems: "center",
@@ -513,14 +513,15 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(169,156,245,0.6)",
-    backgroundColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(232,149,107,0.6)",
+    backgroundColor: "rgba(255,232,214,0.06)",
     justifyContent: "center",
     alignItems: "center",
   },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  // Dark text on the apricot fill - white would be 2.2:1 and unreadable.
+  buttonText: { color: "#241710", fontSize: 16, fontWeight: "700" },
   switchText: {
-    color: "#c9c6e0",
+    color: "#cbb8a8",
     textAlign: "center",
     marginTop: 18,
     fontSize: 14,

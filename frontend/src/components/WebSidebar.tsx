@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { getProfile, listSessions, renameSession, setSessionPinned, removeSession, SessionSummary } from "../services/api";
 import { supabase } from "../services/supabase";
 import { useTheme } from "../context/ThemeContext";
+import { fonts, type } from "../theme/typography";
 
 type Props = {
   onOpenChat: (sessionId: string | null) => void;
@@ -273,7 +274,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     marginBottom: 16,
   },
-  brand: { fontSize: 20, fontWeight: "700" },
+  brand: { ...type.h1, fontSize: 20, lineHeight: 26 },
   newChat: {
     flexDirection: "row",
     alignItems: "center",
@@ -284,7 +285,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 12,
   },
-  newChatText: { fontSize: 14, fontWeight: "600" },
+  newChatText: { ...type.label, fontSize: 14, lineHeight: 19 },
   nav: { marginBottom: 4 },
   navItem: {
     flexDirection: "row",
@@ -295,16 +296,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 2,
   },
-  navLabel: { fontSize: 14 },
+  navLabel: { ...type.label, fontFamily: fonts.regular, fontSize: 14, lineHeight: 19 },
   divider: { height: 1, marginVertical: 10 },
   recentsLabel: {
-    fontSize: 11,
-    letterSpacing: 0.8,
+    ...type.overline,
     paddingHorizontal: 12,
     marginBottom: 6,
     textTransform: "uppercase",
   },
-  empty: { fontSize: 13, paddingHorizontal: 12, marginTop: 8 },
+  empty: { ...type.caption, fontSize: 13, lineHeight: 18, paddingHorizontal: 12, marginTop: 8 },
   chatRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -312,8 +312,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 6,
   },
-  chatTitle: { fontSize: 13 },
-  chatDate: { fontSize: 11, marginTop: 2 },
+  chatTitle: { ...type.caption, fontSize: 13, lineHeight: 18 },
+  chatDate: { ...type.caption, fontSize: 11, lineHeight: 15, marginTop: 2 },
   dropdown: {
     borderWidth: 1,
     borderRadius: 8,

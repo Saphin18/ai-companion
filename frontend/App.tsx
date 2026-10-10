@@ -23,6 +23,7 @@ import {
   getExpoPushToken,
 } from "./src/services/notifications";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
+import { fontAssets } from "./src/theme/typography";
 import { pickerLock } from "./src/services/pickerLock";
 import {
   isBiometricAvailable,
@@ -40,6 +41,7 @@ import GoalsScreen from "./src/screens/GoalsScreen";
 import AboutScreen from "./src/screens/AboutScreen";
 import WallpaperPickerScreen from "./src/screens/WallpaperPickerScreen";
 import WebSidebar from "./src/components/WebSidebar";
+import IntroScreen from "./src/components/IntroScreen";
 
 type View3 =
   | { name: "list" }
@@ -55,10 +57,22 @@ type AuthView = "landing" | "signup" | "login";
 
 const IS_WEB = Platform.OS === "web";
 
-// Load Ionicons font for web (fixes empty-square icons on Vercel deploy)
+// Web font loading. Files live in public/fonts/, which the static export copies
+// to dist/ WITHOUT hashing - that is the only approach that survived bug #73
+// (a CDN URL gave the wrong version, require() was not resolved in the export).
+// Each family name here must match the key used in typography.ts `fontAssets`,
+// or native and web will disagree about what "Figtree-Regular" means.
 if (IS_WEB && typeof document !== "undefined") {
+  const face = (family: string, file: string) =>
+    `@font-face { font-family: '${family}'; src: url('/fonts/${file}') format('truetype'); font-display: swap; }`;
   const style = document.createElement("style");
-  style.textContent = "@font-face { font-family: 'Ionicons'; src: url('/fonts/Ionicons.ttf') format('truetype'); }";
+  style.textContent = [
+    face("Ionicons", "Ionicons.ttf"),
+    face("Fraunces-SemiBold", "Fraunces-SemiBold.ttf"),
+    face("Figtree-Regular", "Figtree-Regular.ttf"),
+    face("Figtree-SemiBold", "Figtree-SemiBold.ttf"),
+    face("Figtree-Bold", "Figtree-Bold.ttf"),
+  ].join("\n");
   document.head.appendChild(style);
 }
 
@@ -125,6 +139,10 @@ function Root() {
   const [webSidebarOpen, setWebSidebarOpen] = useState(true);
   const [webRefreshKey, setWebRefreshKey] = useState(0);
   const [fontsReady, setFontsReady] = useState(false);
+  // Launch animation. Starts already-done on web, because a browser reload is
+  // not an app launch. Living in Root's state means it plays once per process
+  // and never replays on a biometric unlock or a tab refocus.
+  const [introDone, setIntroDone] = useState(IS_WEB);
 
   const { width: windowWidth } = useWindowDimensions();
   const isDesktopWeb = IS_WEB && windowWidth >= 768;
@@ -133,9 +151,11 @@ function Root() {
   const backgroundedAt = useRef<number>(0);
   const wasAuthed = useRef(false);
 
-  // --- Load Ionicons font for web (fixes empty-square icons on Vercel) ---
+  // --- Load Ionicons + the Fraunces/Figtree families ---
+  // On failure we still proceed: falling back to the system font is far better
+  // than refusing to render the app.
   useEffect(() => {
-    Font.loadAsync(Ionicons.font)
+    Font.loadAsync({ ...Ionicons.font, ...fontAssets })
       .then(() => setFontsReady(true))
       .catch(() => setFontsReady(true));
   }, []);
@@ -263,6 +283,22 @@ function Root() {
     <StatusBar barStyle={theme.isDark ? "light-content" : "dark-content"} />
   );
 
+  if (!introDone) {
+    // The intro's background is a fixed warm dark, so force a light status bar
+    // regardless of the user's theme for the duration.
+    return (
+      <>
+        <StatusBar barStyle="light-content" />
+        <IntroScreen
+          canFinish={ready && fontsReady}
+          onDone={() => setIntroDone(true)}
+        />
+      </>
+    );
+  }
+
+  // Still reachable on web (where the intro is skipped) and as a safety net if
+  // the session check outlives the intro's fade-out.
   if (!ready || !fontsReady) {
     return (
       <View

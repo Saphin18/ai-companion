@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -30,6 +30,7 @@ import {
 } from "../services/api";
 import { supabase } from "../services/supabase";
 import { useTheme } from "../context/ThemeContext";
+import { type } from "../theme/typography";
 
 type Props = {
   onOpenChat: (sessionId: string | null) => void;
@@ -547,8 +548,8 @@ const styles = StyleSheet.create({
   headerAvatarImg: { width: 40, height: 40, borderRadius: 20 },
 
   greetWrap: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 24 },
-  greetHi: { fontSize: 26, fontWeight: "700", textAlign: "center" },
-  greetSub: { fontSize: 17, marginTop: 6, textAlign: "center" },
+  greetHi: { ...type.h1, fontSize: 26, lineHeight: 32, textAlign: "center" },
+  greetSub: { ...type.body, fontSize: 17, lineHeight: 24, marginTop: 6, textAlign: "center" },
 
   inputBar: {
     flexDirection: "row",
@@ -567,7 +568,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  input: { flex: 1, fontSize: 16, maxHeight: 120, paddingVertical: 8 },
+  input: { ...type.body, fontSize: 16, flex: 1, maxHeight: 120, paddingVertical: 8 },
   sendBtn: {
     width: 38,
     height: 38,
@@ -587,11 +588,11 @@ const styles = StyleSheet.create({
     paddingTop: 56,
     paddingHorizontal: 14,
   },
-  drawerBrand: { fontSize: 22, fontWeight: "700", marginBottom: 14, paddingHorizontal: 6 },
+  drawerBrand: { ...type.h1, fontSize: 22, lineHeight: 28, marginBottom: 14, paddingHorizontal: 6 },
   drawerItem: { paddingVertical: 12, paddingHorizontal: 6 },
-  drawerItemText: { fontSize: 16 },
+  drawerItemText: { ...type.title },
   drawerDivider: { height: 1, marginVertical: 8 },
-  recentsLabel: { fontSize: 12, letterSpacing: 1, paddingHorizontal: 6, marginBottom: 6 },
+  recentsLabel: { ...type.overline, paddingHorizontal: 6, marginBottom: 6 },
   emptyDrawer: { fontSize: 14, paddingHorizontal: 6, marginTop: 10 },
   recentRow: {
     flexDirection: "row",
@@ -601,8 +602,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   pin: { fontSize: 12, marginRight: 6 },
-  recentTitle: { fontSize: 15, flex: 1, marginRight: 8 },
-  recentDate: { fontSize: 12 },
+  recentTitle: { ...type.body, flex: 1, marginRight: 8 },
+  recentDate: { ...type.caption },
 
   overlay: { flex: 1, justifyContent: "center", padding: 28 },
   sheet: { borderRadius: 18, paddingVertical: 8, overflow: "hidden" },

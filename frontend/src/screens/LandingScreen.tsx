@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { fonts, type } from "../theme/typography";
 
 type Props = {
   onGetStarted: () => void;
@@ -37,7 +38,7 @@ export default function LandingScreen({ onGetStarted, onLogin }: Props) {
   ) => (
     <View style={styles.featureCard}>
       <View style={styles.featureIcon}>
-        <Ionicons name={icon} size={20} color="#a99cf5" />
+        <Ionicons name={icon} size={20} color="#e8956b" />
       </View>
       <View style={styles.featureText}>
         <Text style={styles.featureTitle}>{title}</Text>
@@ -48,7 +49,7 @@ export default function LandingScreen({ onGetStarted, onLogin }: Props) {
 
   return (
     <LinearGradient
-      colors={["#2a2350", "#3b2f63", "#1a1730"]}
+      colors={["#26190f", "#3a2417", "#15110e"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
@@ -113,17 +114,19 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: "#a99cf5",
+    backgroundColor: "#e8956b",
     marginBottom: 18,
-    shadowColor: "#a99cf5",
+    shadowColor: "#e8956b",
     shadowOpacity: 0.6,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 0 },
   },
-  appName: { color: "#fff", fontSize: 28, fontWeight: "700" },
+  // fontWeight is deliberately absent everywhere below - weight comes from the
+  // font family. See the warning in src/theme/typography.ts.
+  appName: { ...type.display, color: "#f6efe8" },
   tagline: {
-    color: "#c9c6e0",
-    fontSize: 15,
+    ...type.body,
+    color: "#cbb8a8",
     marginTop: 8,
     textAlign: "center",
     paddingHorizontal: 20,
@@ -134,49 +137,53 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 14,
     padding: 14,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,232,214,0.06)",
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(255,232,214,0.10)",
     marginBottom: 12,
   },
   featureIcon: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: "rgba(169,156,245,0.15)",
+    backgroundColor: "rgba(232,149,107,0.15)",
     justifyContent: "center",
     alignItems: "center",
   },
   featureText: { flex: 1 },
   featureTitle: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
+    ...type.bodyStrong,
+    color: "#f6efe8",
     marginBottom: 4,
   },
   featureDesc: {
-    color: "#9b97b8",
-    fontSize: 13,
-    lineHeight: 18,
+    ...type.label,
+    fontFamily: fonts.regular,
+    color: "#a89585",
   },
   buttons: { gap: 12 },
   primaryBtn: {
-    backgroundColor: "#7c6cf0",
+    backgroundColor: "#e8956b",
     borderRadius: 14,
     padding: 16,
     alignItems: "center",
   },
-  primaryBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  // Dark text on the apricot fill - white would be 2.2:1 and unreadable.
+  primaryBtnText: { ...type.button, color: "#241710" },
   secondaryBtn: {
-    backgroundColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "rgba(255,232,214,0.07)",
     borderRadius: 14,
     padding: 16,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,232,214,0.14)",
   },
-  secondaryBtnText: { color: "#c9c6e0", fontSize: 16, fontWeight: "600" },
+  secondaryBtnText: {
+    ...type.button,
+    fontFamily: fonts.medium,
+    color: "#cbb8a8",
+  },
 });
 
 
