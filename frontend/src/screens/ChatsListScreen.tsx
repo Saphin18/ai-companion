@@ -12,6 +12,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -29,8 +30,51 @@ import {
   SessionSummary,
 } from "../services/api";
 import { supabase } from "../services/supabase";
+import MoodWeek from "../components/MoodWeek";
 import { useTheme } from "../context/ThemeContext";
 import { type } from "../theme/typography";
+
+// Starter chips (Session 24). The blank text box is the hardest moment in a
+// companion app; these remove it. `send` is a real first message, which also
+// tells detect_mood() straight away what kind of conversation this is, so the
+// register starts right instead of warming up over three exchanges.
+// `onStartChatWithMessage` already existed - no new plumbing.
+const STARTERS: { label: string; send: string | null; primary?: boolean }[] = [
+  { label: "Just talk", send: null, primary: true },
+  { label: "Vent", send: "I need to vent about something" },
+  { label: "Overthinking", send: "I can't stop overthinking" },
+  { label: "Good news", send: "I've got good news" },
+];
+
+// The opening question. Rotated rather than fixed on purpose: the same line
+// every evening becomes wallpaper within a week - the exact failure we just
+// fixed in the chat replies. Keyed to the local date so it is stable all day
+// and different tomorrow.
+const QUESTIONS = [
+  "What's on your mind today?",
+  "How's your head today?",
+  "What's good?",
+  "How's today been?",
+  "Anything on your mind?",
+];
+
+function pickQuestion(): string {
+  const now = new Date();
+  // Late night gets its own line - someone messaging at 2am is not having an
+  // ordinary evening.
+  const h = now.getHours();
+  if (h >= 0 && h < 5) return "Still up?";
+  const dayNumber = Math.floor(now.getTime() / 86400000);
+  return QUESTIONS[dayNumber % QUESTIONS.length];
+}
+
+/** Morning / Afternoon / Evening, from the DEVICE clock. */
+function timeGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Morning";
+  if (h < 18) return "Afternoon";
+  return "Evening";
+}
 
 type Props = {
   onOpenChat: (sessionId: string | null) => void;
@@ -85,6 +129,8 @@ export default function ChatsListScreen({
   const [renameFor, setRenameFor] = useState<SessionSummary | null>(null);
   const [renameText, setRenameText] = useState("");
   const [busy, setBusy] = useState(false);
+  // Picked once per mount so it cannot change under the user mid-session.
+  const [openingQuestion] = useState(pickQuestion);
 
   useEffect(() => {
     (async () => {
@@ -254,14 +300,53 @@ export default function ChatsListScreen({
         </TouchableOpacity>
       </View>
 
-      <View style={styles.greetWrap}>
+      <ScrollView
+        style={styles.homeScroll}
+        contentContainerStyle={styles.homeScrollInner}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={[styles.greetHi, { color: theme.textPrimary }]}>
-          Hey {displayName.split(" ")[0]},
+          {timeGreeting()}, {displayName.split(" ")[0]}
         </Text>
-        <Text style={[styles.greetSub, { color: theme.textSecondary }]}>
-          how are you feeling today?
+        <Text style={[styles.greetAsk, { color: theme.accent }]}>
+          {openingQuestion}
         </Text>
-      </View>
+
+        <Text style={[styles.overline, { color: theme.textSecondary }]}>
+          LAST 7 DAYS
+        </Text>
+        <MoodWeek
+          onOpenSession={onOpenChat}
+          onStartChat={() => onOpenChat(null)}
+        />
+
+        <Text style={[styles.overline, { color: theme.textSecondary }]}>
+          START WITH
+        </Text>
+        <View style={styles.chipRow}>
+          {STARTERS.map((s) => (
+            <TouchableOpacity
+              key={s.label}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: s.primary ? theme.surfaceAlt : theme.surface,
+                  borderColor: s.primary ? "transparent" : theme.border,
+                },
+              ]}
+              activeOpacity={0.75}
+              onPress={() =>
+                s.send ? onStartChatWithMessage(s.send) : onOpenChat(null)
+              }
+            >
+              <Text style={[styles.chipText, { color: theme.textPrimary }]}>
+                {s.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
 
       <View
         style={[
@@ -366,11 +451,22 @@ export default function ChatsListScreen({
 
             <View style={[styles.drawerDivider, { backgroundColor: theme.border }]} />
 
+            {/* Grouped in Session 24. It used to be six items in one
+                flat list with Wallpaper sitting next to Goals, which
+                made the three actual FEATURES harder to pick out than
+                the settings sitting beside them. */}
+            <Text style={[styles.drawerGroup, { color: theme.textSecondary }]}>
+              YOURS
+            </Text>
             {drawerItem("\uD83D\uDCD6  Journal", onOpenJournal)}
             {drawerItem("\u23F0  Reminders", onOpenReminders)}
             {drawerItem("\uD83C\uDFAF  Goals", onOpenGoals)}
-            {drawerItem("\u2139\uFE0F  About", onOpenAbout)}
+
+            <Text style={[styles.drawerGroup, { color: theme.textSecondary }]}>
+              SETTINGS
+            </Text>
             {drawerItem("\uD83C\uDFA8  Wallpaper", onOpenWallpaper)}
+            {drawerItem("\u2139\uFE0F  About", onOpenAbout)}
 
             <View style={[styles.drawerDivider, { backgroundColor: theme.border }]} />
             <Text style={[styles.recentsLabel, { color: theme.textSecondary }]}>
@@ -547,9 +643,16 @@ const styles = StyleSheet.create({
   headerAvatarText: { fontSize: 18, fontWeight: "700" },
   headerAvatarImg: { width: 40, height: 40, borderRadius: 20 },
 
-  greetWrap: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 24 },
-  greetHi: { ...type.h1, fontSize: 26, lineHeight: 32, textAlign: "center" },
-  greetSub: { ...type.body, fontSize: 17, lineHeight: 24, marginTop: 6, textAlign: "center" },
+  // Home is top-anchored and left-aligned now (Session 24). It used to be a
+  // centred greeting over a mostly empty screen.
+  homeScroll: { flex: 1 },
+  homeScrollInner: { paddingHorizontal: 22, paddingBottom: 18 },
+  greetHi: { ...type.h1, marginTop: 14 },
+  greetAsk: { ...type.h1, fontSize: 21, lineHeight: 28, marginTop: 4 },
+  overline: { ...type.overline, marginTop: 26, marginBottom: 10 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: { borderWidth: 1, borderRadius: 999, paddingVertical: 9, paddingHorizontal: 15 },
+  chipText: { ...type.label, fontSize: 13.5 },
 
   inputBar: {
     flexDirection: "row",
@@ -589,6 +692,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   drawerBrand: { ...type.h1, fontSize: 22, lineHeight: 28, marginBottom: 14, paddingHorizontal: 6 },
+  drawerGroup: { ...type.overline, marginTop: 16, marginBottom: 4, paddingHorizontal: 6 },
   drawerItem: { paddingVertical: 12, paddingHorizontal: 6 },
   drawerItemText: { ...type.title },
   drawerDivider: { height: 1, marginVertical: 8 },

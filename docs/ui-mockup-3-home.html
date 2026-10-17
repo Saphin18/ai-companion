@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home Screen Options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root,:root[data-theme="dark"]{
+  --bg:#15110e;--surface:#221b16;--surface-alt:rgba(255,240,230,.09);
+  --text:#f6efe8;--text-2:#a89585;--accent:#e8956b;--accent-text:#241710;
+  --border:rgba(246,239,232,.11);--danger:#ef6b5e;--page:#0d0a08;--panel:#1a1512;
+}
+:root[data-theme="light"]{
+  --bg:#faf6f1;--surface:#ffffff;--surface-alt:#f1e9e0;
+  --text:#2e2520;--text-2:#7a6b60;--accent:#ad5330;--accent-text:#fff8f3;
+  --border:rgba(46,37,32,.10);--danger:#b4342a;--page:#f2ece4;--panel:#fffdfa;
+}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--page);color:var(--text);font-family:"Figtree",system-ui,sans-serif;
+  font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding:40px 16px 90px}
+h1,h2{font-family:"Fraunces",Georgia,serif;font-weight:600;letter-spacing:-.3px}
+.top{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between}
+.top h1{font-size:33px;line-height:1.15;margin:0}
+.sub{color:var(--text-2);max-width:68ch;margin:10px 0 0}
+.btn{font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;background:var(--surface);
+  color:var(--text);border:1px solid var(--border);border-radius:999px;padding:9px 16px}
+.btn.primary{background:var(--accent);color:var(--accent-text);border-color:transparent}
+.controls{display:flex;gap:8px}
+.note{border-left:3px solid var(--accent);background:var(--surface);padding:15px 19px;
+  border-radius:0 12px 12px 0;margin:26px 0 0;color:var(--text-2)}
+.note b{color:var(--text)}
+.note em{color:var(--accent);font-style:normal;font-weight:600}
+section{margin-top:58px;padding-top:32px;border-top:1px solid var(--border)}
+.sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.sec-head h2{font-size:25px;margin:0}
+.tag{font-size:11px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;color:var(--accent);
+  border:1px solid var(--border);border-radius:999px;padding:4px 10px}
+.sec-sub{color:var(--text-2);margin:0 0 26px;max-width:72ch}
+
+.phone{width:318px;height:650px;border-radius:38px;background:var(--bg);border:1px solid var(--border);
+  box-shadow:0 26px 60px rgba(0,0,0,.45),0 0 0 8px var(--panel);overflow:hidden;
+  position:relative;display:flex;flex-direction:column}
+.status{height:28px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;
+  font-size:11px;color:var(--text-2);font-weight:600;flex:0 0 auto}
+.screen{flex:1;display:flex;flex-direction:column;min-height:0;position:relative;
+  padding:0 22px 84px;overflow-y:auto}
+.hbar{display:flex;align-items:center;justify-content:space-between;padding:8px 0 4px;flex:0 0 auto}
+.ham{font-size:21px}
+.ava{width:34px;height:34px;border-radius:50%;background:var(--accent);color:var(--accent-text);
+  display:grid;place-items:center;font-weight:700;font-size:14px}
+.greet{font-family:"Fraunces",serif;font-weight:600;font-size:25px;line-height:31px;margin:18px 0 0}
+.ask{font-family:"Fraunces",serif;font-weight:600;font-size:21px;line-height:28px;color:var(--accent);margin:4px 0 0}
+.overline{font-size:11px;letter-spacing:1.1px;text-transform:uppercase;font-weight:600;
+  color:var(--text-2);margin:26px 0 10px}
+.mood{display:flex;gap:9px}
+.dot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:10px;
+  font-weight:600;color:var(--text-2);border:1px solid var(--border);background:var(--surface)}
+.dot.f1{background:rgba(232,149,107,.22);color:var(--accent)}
+.dot.f2{background:rgba(232,149,107,.45);color:var(--accent-text)}
+.dot.f3{background:var(--accent);color:var(--accent-text)}
+.dot.today{border:1px dashed var(--accent);color:var(--accent);background:transparent}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--border);background:var(--surface);border-radius:999px;
+  padding:8px 14px;font-size:13.5px;font-weight:600}
+.chip.hot{background:var(--surface-alt);border-color:transparent}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:13px}
+.tile .ic{font-size:18px}
+.tile b{display:block;font-size:14px;font-weight:600;margin-top:7px}
+.tile span{font-size:12px;color:var(--text-2)}
+.inputbar{position:absolute;left:0;right:0;bottom:0;padding:11px 20px 16px;
+  background:linear-gradient(to top,var(--bg) 62%,transparent);display:flex;gap:9px;align-items:center}
+.field{flex:1;display:flex;align-items:center;background:var(--surface);border:1px solid var(--border);
+  border-radius:999px;padding:11px 16px;color:var(--text-2);font-size:14.5px}
+.circ{width:40px;height:40px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;
+  background:var(--accent);color:var(--accent-text);font-size:17px}
+.circ.ghost{background:var(--surface);color:var(--text-2);border:1px solid var(--border)}
+
+/* the contextual line */
+.ctx{display:flex;align-items:center;gap:11px;background:var(--surface);border:1px solid var(--border);
+  border-left:3px solid var(--accent);border-radius:0 14px 14px 0;padding:11px 14px;margin-top:20px}
+.ctx .ic{font-size:16px;flex:0 0 auto}
+.ctx b{display:block;font-size:14px;font-weight:600}
+.ctx span{font-size:12.5px;color:var(--text-2)}
+
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(318px,1fr));gap:30px;justify-items:center}
+.opt{display:flex;flex-direction:column;gap:14px;width:100%;max-width:330px}
+.opt h3{margin:0 0 4px;font-size:18px;font-weight:600}
+.opt .d{margin:0;color:var(--text-2);font-size:13.5px;line-height:1.5}
+.verdict{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+  border-radius:999px;padding:3px 9px;margin-bottom:7px}
+.v-best{background:var(--accent);color:var(--accent-text)}
+.v-ok{background:var(--surface-alt);color:var(--text-2)}
+
+table{width:100%;border-collapse:collapse;margin-top:20px;font-size:14px}
+th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:var(--text-2);font-weight:600}
+.yes{color:var(--accent);font-weight:700}
+.no{color:var(--text-2)}
+code{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;background:var(--surface-alt);
+  padding:2px 6px;border-radius:6px;color:var(--accent)}
+footer{margin-top:56px;padding-top:24px;border-top:1px solid var(--border);color:var(--text-2);font-size:13.5px}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.stagger>*{opacity:0;animation:rise .5s cubic-bezier(.22,1,.36,1) forwards}
+.stagger>*:nth-child(1){animation-delay:.04s}.stagger>*:nth-child(2){animation-delay:.14s}
+.stagger>*:nth-child(3){animation-delay:.24s}.stagger>*:nth-child(4){animation-delay:.34s}
+.stagger>*:nth-child(5){animation-delay:.44s}.stagger>*:nth-child(6){animation-delay:.54s}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="top">
+  <div>
+    <h1>Home &mdash; how much belongs here?</h1>
+    <p class="sub">
+      You asked whether Goals and Journal need to be on home when they already live in the
+      drawer. Short answer below, then three versions so you can see the difference.
+    </p>
+  </div>
+  <div class="controls">
+    <button class="btn primary" onclick="replay()">&#9654;&nbsp; Replay</button>
+    <button class="btn" onclick="toggleTheme()">Dark&nbsp;/&nbsp;Light</button>
+  </div>
+</div>
+
+<div class="note">
+  <b>The rule I'd use: never duplicate navigation &mdash; surface state.</b><br><br>
+  A tile that says &ldquo;Goals&nbsp;&rarr;&rdquo; is the drawer link again with a bigger tap
+  target. It earns nothing and it costs a third of the screen. But a line that says
+  <em>&ldquo;Sleep by 12 &mdash; 4 days running&rdquo;</em> tells you something you didn't know,
+  and <i>that</i> earns its place.<br><br>
+  So you're half right. The duplication is pointless. But deleting them outright has a real
+  cost too: behind a hamburger, Journal, Goals and Reminders effectively <b>do not exist</b> for
+  most people, and those three are the only reason this is more than a chat app. A feature
+  nobody sees doesn't get used, and one nobody uses may as well not be built.
+</div>
+
+<section>
+  <div class="sec-head"><h2>Three versions</h2><span class="tag">same tokens, same type</span></div>
+  <p class="sec-sub">All three keep your greeting, the question, the chips and the input bar.
+    They differ only in how much sits between.</p>
+
+  <div class="opts">
+
+    <!-- A -->
+    <div class="opt">
+      <div>
+        <span class="verdict v-ok">Option A</span>
+        <h3>Bare</h3>
+        <p class="d">Greeting, question, chips, input. Nothing else. Closest to a person opening
+          a conversation, furthest from an app. The drawer keeps everything else.</p>
+      </div>
+      <div class="phone">
+        <div class="status"><span>5:35</span><span>&#9679;&#9679;&#9679;&nbsp; 46%</span></div>
+        <div class="screen stagger">
+          <div class="hbar"><span class="ham">&#9776;</span><span class="ava">S</span></div>
+          <div>
+            <p class="greet">Evening, Saphin</p>
+            <p class="ask">What's on your mind today?</p>
+          </div>
+          <div>
+            <p class="overline">Start with</p>
+            <div class="chips">
+              <span class="chip hot">Just talk</span><span class="chip">Vent</span>
+              <span class="chip">Overthinking</span><span class="chip">Good news</span>
+            </div>
+          </div>
+          <div class="inputbar">
+            <div class="circ ghost">+</div><div class="field">Chat with Saphin&hellip;</div>
+            <div class="circ">&#127908;</div>
+          </div>
+        </div>
+      </div>
+      <p class="d"><b>Risk:</b> Journal, Goals and Reminders quietly die of invisibility.</p>
+    </div>
+
+    <!-- B -->
+    <div class="opt">
+      <div>
+        <span class="verdict v-best">Option B &mdash; my pick</span>
+        <h3>Mood + one contextual line</h3>
+        <p class="d">Mood week always (it is the app remembering <i>for</i> you, and it exists
+          nowhere else). Then at most <b>one</b> line, shown only when there is something real
+          to say. Nothing to say &rarr; nothing appears.</p>
+      </div>
+      <div class="phone">
+        <div class="status"><span>5:35</span><span>&#9679;&#9679;&#9679;&nbsp; 46%</span></div>
+        <div class="screen stagger">
+          <div class="hbar"><span class="ham">&#9776;</span><span class="ava">S</span></div>
+          <div>
+            <p class="greet">Evening, Saphin</p>
+            <p class="ask">What's on your mind today?</p>
+          </div>
+          <div>
+            <p class="overline">This week</p>
+            <div class="mood">
+              <span class="dot f2">M</span><span class="dot f1">T</span><span class="dot f1">W</span>
+              <span class="dot f3">T</span><span class="dot f2">F</span><span class="dot f1">S</span>
+              <span class="dot today">+</span>
+            </div>
+          </div>
+          <div class="ctx">
+            <span class="ic">&#127919;</span>
+            <span><b>Sleep by 12</b><span>4 days running &mdash; don't break it</span></span>
+          </div>
+          <div>
+            <p class="overline">Start with</p>
+            <div class="chips">
+              <span class="chip hot">Just talk</span><span class="chip">Vent</span>
+              <span class="chip">Overthinking</span><span class="chip">Good news</span>
+            </div>
+          </div>
+          <div class="inputbar">
+            <div class="circ ghost">+</div><div class="field">Chat with Saphin&hellip;</div>
+            <div class="circ">&#127908;</div>
+          </div>
+        </div>
+      </div>
+      <p class="d"><b>Why:</b> earns its space every time, because it only shows up when it has
+        earned it.</p>
+    </div>
+
+    <!-- C -->
+    <div class="opt">
+      <div>
+        <span class="verdict v-ok">Option C</span>
+        <h3>Tiles (what I drew before)</h3>
+        <p class="d">Fixed Goals and Journal tiles with counts. More discoverable, but they sit
+          there whether or not they have anything to report &mdash; and &ldquo;0 active&rdquo;
+          is a worse look than no tile.</p>
+      </div>
+      <div class="phone">
+        <div class="status"><span>5:35</span><span>&#9679;&#9679;&#9679;&nbsp; 46%</span></div>
+        <div class="screen stagger">
+          <div class="hbar"><span class="ham">&#9776;</span><span class="ava">S</span></div>
+          <div>
+            <p class="greet">Evening, Saphin</p>
+            <p class="ask">What's on your mind today?</p>
+          </div>
+          <div>
+            <p class="overline">This week</p>
+            <div class="mood">
+              <span class="dot f2">M</span><span class="dot f1">T</span><span class="dot f1">W</span>
+              <span class="dot f3">T</span><span class="dot f2">F</span><span class="dot f1">S</span>
+              <span class="dot today">+</span>
+            </div>
+          </div>
+          <div>
+            <p class="overline">Start with</p>
+            <div class="chips">
+              <span class="chip hot">Just talk</span><span class="chip">Vent</span>
+              <span class="chip">Overthinking</span><span class="chip">Good news</span>
+            </div>
+          </div>
+          <div>
+            <p class="overline">Yours</p>
+            <div class="tiles">
+              <div class="tile"><div class="ic">&#127919;</div><b>Goals</b><span>2 active</span></div>
+              <div class="tile"><div class="ic">&#128214;</div><b>Journal</b><span>3 this week</span></div>
+            </div>
+          </div>
+          <div class="inputbar">
+            <div class="circ ghost">+</div><div class="field">Chat with Saphin&hellip;</div>
+            <div class="circ">&#127908;</div>
+          </div>
+        </div>
+      </div>
+      <p class="d"><b>Risk:</b> busiest of the three, and it is the one that reads as a dashboard.</p>
+    </div>
+
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><h2>What the contextual line says</h2><span class="tag">option B detail</span></div>
+  <p class="sec-sub">
+    One line, first match wins, nothing if none match. Every condition below runs off data you
+    already store &mdash; no new tables.
+  </p>
+
+  <table>
+    <thead><tr><th style="width:36%">When</th><th>Shows</th><th style="width:20%">From</th></tr></thead>
+    <tbody>
+      <tr><td>A reminder is due today</td><td><b>Call mum</b> &middot; 7:00 pm</td><td><code>reminder_repository</code></td></tr>
+      <tr><td>A goal has a streak of 3+</td><td><b>Sleep by 12</b> &middot; 4 days running</td><td><code>goal_repository</code></td></tr>
+      <tr><td>Mood logged low 3 days straight</td><td><b>Rough few days.</b> Want to talk about it?</td><td><code>mood_repository</code></td></tr>
+      <tr><td>Chatted in the last hour</td><td>&#8249; <b>Back to this afternoon</b></td><td><code>chat_repository</code></td></tr>
+      <tr><td>Journal untouched 7+ days</td><td><b>Nothing written in a while.</b></td><td><code>journal_repository</code></td></tr>
+      <tr><td class="no">None of the above</td><td class="no">&mdash; nothing renders &mdash;</td><td class="no">&nbsp;</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <b>The thing that makes this work is the last row.</b> Most home screens show every widget
+    every day, so people stop seeing any of them. If this line is absent four days out of five,
+    the day it <i>does</i> appear you'll actually read it. Same principle as the quote gate we
+    just built into the chat &mdash; rare is what makes it land.
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><h2>So should Goals and Journal stay in the drawer?</h2><span class="tag">yes</span></div>
+  <p class="sec-sub">With two changes.</p>
+  <table>
+    <thead><tr><th style="width:26%">Item</th><th style="width:22%">Where</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td><b>Journal</b></td><td class="yes">Drawer only</td>
+        <td>Deliberate, occasional. Nobody journals by accident, so nobody needs a shortcut &mdash; they came for it.</td></tr>
+      <tr><td><b>Goals</b></td><td class="yes">Drawer + streak line</td>
+        <td>Lives in the drawer, but a streak is time-sensitive and worth one line on home.</td></tr>
+      <tr><td><b>Reminders</b></td><td class="yes">Drawer + due-today line</td>
+        <td>A reminder you can't see has failed at its only job. This is the strongest case of the three.</td></tr>
+      <tr><td><b>About / Wallpaper</b></td><td class="no">Move into Profile</td>
+        <td>Settings, not features. They're padding the drawer and making the real items harder to find.</td></tr>
+      <tr><td><b>Mood</b></td><td class="yes">Home only</td>
+        <td>You log it already and the user never sees it. Nowhere else to put it.</td></tr>
+    </tbody>
+  </table>
+  <div class="note">
+    <b>Second change: label the drawer honestly.</b> Right now it is six items in a flat list
+    with Wallpaper sitting next to Goals. Two groups &mdash; <em>Yours</em> (Journal, Goals,
+    Reminders) and <em>Settings</em> (Profile, Wallpaper, About) &mdash; makes the features
+    findable without putting anything extra on home.
+  </div>
+</section>
+
+<footer>
+  <b>Recommendation:</b> Option B. Mood strip always, one contextual line when it has earned it,
+  no fixed tiles. Goals and Journal stay in the drawer; move About and Wallpaper into Profile
+  and group what's left.
+  <br><br>
+  Three sample files now in <code>docs/</code>. No app code modified for any of them.
+</footer>
+</div>
+<script>
+function toggleTheme(){var r=document.documentElement;
+  r.setAttribute("data-theme",r.getAttribute("data-theme")==="dark"?"light":"dark")}
+function replay(){document.querySelectorAll(".stagger").forEach(function(el){
+  el.classList.remove("stagger");void el.offsetWidth;el.classList.add("stagger")})}
+replay();
+</script>
+</body>
+</html>

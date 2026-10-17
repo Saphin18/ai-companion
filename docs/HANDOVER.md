@@ -5,6 +5,30 @@
 > OVERRIDES everything above it wherever they conflict. Read the last section first, then come
 > back up here for the stable reference material (architecture, contracts, secrets, bugs).
 
+---
+
+## SETTLED - DO NOT RE-RAISE THESE
+
+> Everything in this list was carried as an open RED item through several sessions
+> **after it had already been done**, because the sections that raised it are
+> append-only and nobody ever closed it anywhere a later session would look. Each
+> session then spent the owner's time asking about finished work. If you find one of
+> these flagged as outstanding further down, that text is a HISTORICAL RECORD of what
+> was true when that section was written - it is not a task.
+
+| Item | Status | How it was confirmed |
+|---|---|---|
+| Supabase DB password rotation | **DONE** (owner, before Oct 17 2026) | `/health` returns ok, so `DATABASE_URL` connects; `.env` never committed; `git grep` finds the live password in no tracked file |
+| `CRON_SECRET` rotation | **DONE** (owner, verified Oct 17 2026) | wrong secret -> 403, real secret -> 200 `{"sent":0}`, so local `.env` and Render match |
+
+**Still genuinely unverifiable from a session:** whether **cron-job.org** holds the same
+`CRON_SECRET` - it is a third copy behind the owner's login. The signal is behavioural:
+if the daily check-in notification still arrives, it matches.
+
+**Before adding ANY security or config item to an outstanding list, check it here first,
+and prefer a live probe over trusting this document.** That is how both of the above
+were closed. Full detail in SECTION 5.
+
 > **This single file replaces every previous handover file and every kickoff file.**
 > Paste ONLY this into a new chat. It contains the whole project from day one to now:
 > what we're building, every architecture decision, every file and its exact path, every
@@ -636,10 +660,50 @@ CRON_SECRET=...                   # Phase 4 â€” must MATCH the cron-job.org
 SQLAlchemy try psycopg2 and crash). Any `@` **inside the password** must be URL-encoded as `%40`;
 the `@` before the host stays literal. Use the **Session pooler** URI from Supabase -> Connect.
 
-**SECURITY TODO:** the Supabase DB password was exposed in a chat transcript. Rotate it
-(Supabase -> Settings -> Database -> reset password), then update `DATABASE_URL` **both** locally
-and in Render. Same applies to `CRON_SECRET` â€” regenerate it and update it in Render AND
-cron-job.org.
+**SECURITY - Supabase DB password: DONE, do not re-raise.** It was exposed in a chat
+transcript around Session 17 and **the owner rotated it** (confirmed Oct 17, 2026).
+Sessions 18-23 each carried it forward as an open RED item because nobody ever closed it
+here, so every session re-flagged work that was already done and spent the owner's time
+on it again.
+
+Verified this session: `backend/.env` is gitignored and was never committed, and the live
+password appears in no tracked file (`git grep` for the actual string returns nothing).
+
+**If you are a future session: this item is CLOSED.** Do not put it on an outstanding list
+again. The RED entries in Sections 12, 15 and 18 are historical records of what was true
+when those sessions were written - they are not live tasks.
+
+**SECURITY - `CRON_SECRET`: DONE, verified live Oct 17, 2026.**
+The owner rotated this too. Confirmed empirically rather than taken on trust:
+
+```
+# wrong secret  -> HTTP 403   (endpoint is guarded, zero side effects)
+# real secret   -> HTTP 200 {"sent":0}   (local .env matches Render)
+curl -X POST https://saphin-ai-backend.onrender.com/internal/run-checkins \
+     -H "X-Cron-Secret: $SECRET"
+```
+
+`/health` also returned `{"status":"ok"}`, which only happens when `DATABASE_URL`
+connects - independent confirmation that the rotated DB password is correct in Render.
+
+**The one thing that CANNOT be verified from a session:** cron-job.org holds the same
+secret in a third place and needs the owner's login. Render matching local does not prove
+cron-job.org matches. The signal is behavioural - **if the daily check-in notification
+still arrives, cron-job.org matches.** If check-ins ever stop silently with no other
+symptom, a secret mismatch there is the first thing to check.
+
+**Calling run-checkins by hand is safe.** The secret is checked before anything else, so a
+wrong one is side-effect free; and a correct one only sends to profiles whose local
+check-in window is currently open and whose `last_checkin_date` is not today. cron-job.org
+already makes this exact call 96 times a day.
+
+**DEPLOYMENT MARKER (Session 24).** `run-checkins` now returns `{"sent": N, "pruned": M}`.
+The old version returned `{"sent": N}` only. Hitting the endpoint therefore tells you
+which build is live on Render without reading any logs.
+
+**DATABASE_URL rules still apply when editing it:** scheme MUST be `postgresql+asyncpg://`,
+and any `@` inside the password must be URL-encoded as `%40`. Use the **Session pooler**
+URI from Supabase -> Connect.
 
 ## frontend/.env
 
@@ -1305,7 +1369,8 @@ Nothing is blocking. Everything below is polish or a new feature area.
 **Immediate:**
 
 - Install and smoke-test the new APK (see 0.1).
-- Rotate the exposed Supabase DB password + `CRON_SECRET` (SECTION 5).
+- ~~Rotate the exposed Supabase DB password + `CRON_SECRET`~~ **DONE by the owner;**
+  **verified live Oct 17, 2026. See SECTION 5. Do not re-raise this.**
 
 **Optional polish:**
 

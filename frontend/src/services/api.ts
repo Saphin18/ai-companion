@@ -374,3 +374,27 @@ export async function updateGoal(
   });
   if (!res.ok) throw new Error(`Goal update failed: ${res.status}`);
 }
+
+// ---------------------------------------------------------------------------
+// MOODS (Session 24)
+// ---------------------------------------------------------------------------
+// detect_mood() has logged a reading for every message sent since Phase 3A and
+// nothing has ever read one back. These power the "Last 7 days" strip on home.
+
+export type MoodLog = {
+  id: string;
+  mood: string;
+  intensity: number;
+  note: string | null;
+  session_id: string | null;
+  session_title: string | null;
+  created_at: string; // UTC ISO-8601, e.g. 2026-10-16T18:30:00Z
+};
+
+export async function listRecentMoods(days = 7): Promise<MoodLog[]> {
+  const res = await fetch(`${API_URL}/moods/recent?days=${days}`, {
+    headers: await authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Moods load failed: ${res.status}`);
+  return res.json();
+}

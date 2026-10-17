@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Companion UI Sample 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* Lamplight tokens - from frontend/src/theme/themes/default/index.ts */
+:root,:root[data-theme="dark"]{
+  --bg:#15110e; --surface:#221b16; --surface-alt:rgba(255,240,230,.09);
+  --text:#f6efe8; --text-2:#a89585; --accent:#e8956b; --accent-text:#241710;
+  --border:rgba(246,239,232,.11); --danger:#ef6b5e;
+  --bubble-user:#a05939; --bubble-user-text:#fff6f0;
+  --bubble-ai:#2a211b; --bubble-ai-text:#efe4da;
+  --page:#0d0a08; --panel:#1a1512;
+}
+:root[data-theme="light"]{
+  --bg:#faf6f1; --surface:#ffffff; --surface-alt:#f1e9e0;
+  --text:#2e2520; --text-2:#7a6b60; --accent:#ad5330; --accent-text:#fff8f3;
+  --border:rgba(46,37,32,.10); --danger:#b4342a;
+  --bubble-user:#ad5330; --bubble-user-text:#fff8f3;
+  --bubble-ai:#f1e9e0; --bubble-ai-text:#2e2520;
+  --page:#f2ece4; --panel:#fffdfa;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--page);color:var(--text);
+  font-family:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1240px;margin:0 auto;padding:40px 16px 90px}
+h1,h2{font-family:"Fraunces",Georgia,serif;font-weight:600;letter-spacing:-.3px}
+.top{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between}
+.top h1{font-size:34px;line-height:1.15;margin:0}
+.sub{color:var(--text-2);max-width:66ch;margin:10px 0 0}
+.controls{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;background:var(--surface);
+  color:var(--text);border:1px solid var(--border);border-radius:999px;padding:9px 16px;transition:transform .12s}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--accent);color:var(--accent-text);border-color:transparent}
+.note{border-left:3px solid var(--accent);background:var(--surface);padding:14px 18px;
+  border-radius:0 12px 12px 0;margin:26px 0 0;color:var(--text-2)}
+.note b{color:var(--text)}
+section{margin-top:62px;padding-top:32px;border-top:1px solid var(--border)}
+.sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.sec-head h2{font-size:25px;margin:0}
+.tag{font-size:11px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;color:var(--accent);
+  border:1px solid var(--border);border-radius:999px;padding:4px 10px}
+.sec-sub{color:var(--text-2);margin:0 0 26px;max-width:70ch}
+
+.phone{width:320px;height:664px;border-radius:38px;background:var(--bg);border:1px solid var(--border);
+  box-shadow:0 26px 60px rgba(0,0,0,.45),0 0 0 8px var(--panel);overflow:hidden;
+  position:relative;display:flex;flex-direction:column}
+.status{height:28px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;font-size:11px;color:var(--text-2);font-weight:600}
+.screen{flex:1;display:flex;flex-direction:column;min-height:0;position:relative;padding:0 22px}
+
+/* option cards */
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:30px}
+.opt{display:flex;flex-direction:column;gap:14px;align-items:center}
+.opt-head{width:100%;max-width:330px}
+.opt-head h3{margin:0 0 4px;font-size:18px;font-weight:600}
+.opt-head p{margin:0;color:var(--text-2);font-size:13.5px;line-height:1.5}
+.verdict{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+  border-radius:999px;padding:3px 9px;margin-bottom:7px}
+.v-best{background:var(--accent);color:var(--accent-text)}
+.v-ok{background:var(--surface-alt);color:var(--text-2)}
+
+/* ---- A: editorial ---- */
+.edi{justify-content:center}
+.edi .big{font-family:"Fraunces",serif;font-weight:600;font-size:34px;line-height:1.18;letter-spacing:-.6px;margin:0}
+.edi .big em{font-style:normal;color:var(--accent)}
+.edi .by{color:var(--text-2);margin:16px 0 0;font-size:14.5px;max-width:25ch}
+.dotmark{width:13px;height:13px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 22px rgba(232,149,107,.6);display:inline-block;vertical-align:baseline;
+  animation:pulse 3.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.28);opacity:1}}
+
+/* ---- B: ambient orb ---- */
+.amb{justify-content:center;align-items:center;text-align:center;overflow:hidden}
+.amb::before{
+  content:"";position:absolute;inset:-26% -40%;
+  background:radial-gradient(circle at 50% 42%, rgba(232,149,107,.36), transparent 62%);
+  animation:drift 11s ease-in-out infinite;
+}
+@keyframes drift{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(4%,-5%) scale(1.14)}}
+.bigorb{width:118px;height:118px;border-radius:50%;position:relative;z-index:2;
+  background:radial-gradient(circle at 34% 30%,#ffd2ae,var(--accent) 55%,#7e3f23 100%);
+  box-shadow:0 0 70px rgba(232,149,107,.5);animation:breathe 5s ease-in-out infinite}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.amb h2{position:relative;z-index:2;font-size:27px;margin:30px 0 0;line-height:1.25}
+.amb p{position:relative;z-index:2;color:var(--text-2);margin:9px 0 0;font-size:14.5px}
+
+/* ---- C: rotating line ---- */
+.rot{justify-content:center}
+.rot .lead{font-size:13px;letter-spacing:1.1px;text-transform:uppercase;color:var(--text-2);
+  font-weight:600;margin:0 0 16px}
+.cycler{position:relative;height:184px}
+.slide{position:absolute;inset:0;opacity:0;animation:cycle 13.5s linear infinite}
+.slide:nth-child(2){animation-delay:4.5s}
+.slide:nth-child(3){animation-delay:9s}
+@keyframes cycle{0%{opacity:0;transform:translateY(9px)}4%{opacity:1;transform:none}
+  29%{opacity:1;transform:none}33%{opacity:0;transform:translateY(-9px)}100%{opacity:0}}
+.said{font-family:"Fraunces",serif;font-weight:600;font-size:25px;line-height:1.3;margin:0;color:var(--text)}
+.said::before{content:"\201C"}.said::after{content:"\201D"}
+.arrow{color:var(--accent);font-size:17px;margin:13px 0 11px}
+.back{color:var(--text-2);font-size:16px;line-height:1.5;margin:0}
+
+/* ---- D: try it ---- */
+.try{justify-content:center}
+.try h2{font-size:26px;margin:0;line-height:1.26}
+.try .hint{color:var(--text-2);margin:10px 0 20px;font-size:14.5px}
+.livefield{display:flex;align-items:center;gap:10px;background:var(--surface);
+  border:1px solid var(--accent);border-radius:999px;padding:13px 17px}
+.caret{width:2px;height:17px;background:var(--accent);animation:blink 1.1s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.typed{color:var(--text);font-size:15px}
+.demo-reply{background:var(--bubble-ai);color:var(--bubble-ai-text);border-radius:19px;
+  border-bottom-left-radius:7px;padding:11px 15px;margin-top:14px;font-size:15px;line-height:1.5;
+  animation:rise .6s cubic-bezier(.22,1,.36,1) .5s both}
+.gate{color:var(--text-2);font-size:12.5px;text-align:center;margin:15px 0 0}
+
+@keyframes rise{from{opacity:0;transform:translateY(13px)}to{opacity:1;transform:none}}
+.stagger>*{opacity:0;animation:rise .55s cubic-bezier(.22,1,.36,1) forwards}
+.stagger>*:nth-child(1){animation-delay:.05s}
+.stagger>*:nth-child(2){animation-delay:.16s}
+.stagger>*:nth-child(3){animation-delay:.27s}
+.stagger>*:nth-child(4){animation-delay:.38s}
+.stagger>*:nth-child(5){animation-delay:.49s}
+.stagger>*:nth-child(6){animation-delay:.60s}
+.stagger>*:nth-child(7){animation-delay:.71s}
+
+.cta{display:flex;flex-direction:column;gap:10px;margin-top:26px}
+.cta a{text-align:center;padding:14px;border-radius:15px;text-decoration:none;font-weight:700;font-size:16px}
+.cta .go{background:var(--accent);color:var(--accent-text)}
+.cta .in{border:1px solid var(--border);color:var(--text)}
+.fine{text-align:center;color:var(--text-2);font-size:12px;margin:13px 0 0}
+
+/* ---- home ---- */
+.hbar{display:flex;align-items:center;justify-content:space-between;padding:8px 0 4px}
+.ham{font-size:21px}
+.ava{width:34px;height:34px;border-radius:50%;background:var(--accent);color:var(--accent-text);
+  display:grid;place-items:center;font-weight:700;font-size:14px}
+.greet{font-family:"Fraunces",serif;font-weight:600;font-size:25px;line-height:31px;margin:18px 0 0}
+.ask{font-family:"Fraunces",serif;font-weight:600;font-size:21px;line-height:28px;
+  color:var(--accent);margin:4px 0 0}
+.overline{font-size:11px;letter-spacing:1.1px;text-transform:uppercase;font-weight:600;
+  color:var(--text-2);margin:26px 0 10px}
+.mood{display:flex;gap:9px}
+.dot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:10px;
+  font-weight:600;color:var(--text-2);border:1px solid var(--border);background:var(--surface)}
+.dot.f1{background:rgba(232,149,107,.22);color:var(--accent)}
+.dot.f2{background:rgba(232,149,107,.45);color:var(--accent-text)}
+.dot.f3{background:var(--accent);color:var(--accent-text)}
+.dot.today{border:1px dashed var(--accent);color:var(--accent);background:transparent}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--border);background:var(--surface);border-radius:999px;
+  padding:8px 14px;font-size:13.5px;font-weight:600}
+.chip.hot{background:var(--surface-alt);border-color:transparent}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:13px}
+.tile .ic{font-size:18px}
+.tile b{display:block;font-size:14px;font-weight:600;margin-top:7px}
+.tile span{font-size:12px;color:var(--text-2)}
+.inputbar{position:absolute;left:0;right:0;bottom:0;padding:11px 20px 16px;
+  background:linear-gradient(to top,var(--bg) 62%,transparent);display:flex;gap:9px;align-items:center}
+.field{flex:1;display:flex;align-items:center;background:var(--surface);border:1px solid var(--border);
+  border-radius:999px;padding:11px 16px;color:var(--text-2);font-size:14.5px}
+.circ{width:40px;height:40px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;
+  background:var(--accent);color:var(--accent-text);font-size:17px}
+.circ.ghost{background:var(--surface);color:var(--text-2);border:1px solid var(--border)}
+
+/* ---- voice states ---- */
+.vrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(286px,1fr));gap:22px}
+.vcard{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:17px;
+  display:flex;flex-direction:column;gap:13px}
+.vcard h3{margin:0;font-size:16px;font-weight:600}
+.vcard>p{margin:0;color:var(--text-2);font-size:13.5px;line-height:1.5}
+.vstage{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:13px}
+.bar{display:flex;align-items:center;gap:9px}
+.pill{flex:1;display:flex;align-items:center;gap:9px;background:var(--surface-alt);
+  border-radius:999px;padding:10px 14px;font-size:13.5px}
+.recdot{width:8px;height:8px;border-radius:50%;background:var(--danger);animation:blip 1.2s ease-in-out infinite}
+@keyframes blip{50%{opacity:.25}}
+.icbtn{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto;
+  background:var(--surface-alt);font-size:15px}
+.icbtn.send{background:var(--accent);color:var(--accent-text)}
+.icbtn.dim{color:var(--text-2);opacity:.55}
+.cancelbtn{display:flex;align-items:center;gap:6px;background:transparent;border:1px solid var(--danger);
+  color:var(--danger);border-radius:999px;padding:9px 15px;font-size:13.5px;font-weight:700;flex:0 0 auto}
+.timer{font-variant-numeric:tabular-nums;font-weight:700;font-size:14px;color:var(--text)}
+.wave{display:flex;gap:2.5px;align-items:center;height:22px;flex:1}
+.wave i{width:3px;border-radius:2px;background:var(--accent);display:block;animation:wv 1.05s ease-in-out infinite}
+.wave.still i{animation:none;background:var(--text-2);opacity:.6}
+@keyframes wv{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+.bad{color:var(--danger);font-weight:600}
+.good{color:var(--accent);font-weight:600}
+footer{margin-top:58px;padding-top:24px;border-top:1px solid var(--border);color:var(--text-2);font-size:13.5px}
+code{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;background:var(--surface-alt);
+  padding:2px 6px;border-radius:6px;color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="top">
+  <div>
+    <h1>Sample 2 &mdash; landing options, revised home, voice</h1>
+    <p class="sub">
+      Four landing directions that are <b>not</b> a fake chat screenshot, the home screen with
+      your changes, and the voice recorder fixed. Still nothing touched in the app.
+    </p>
+  </div>
+  <div class="controls">
+    <button class="btn primary" onclick="replay()">&#9654;&nbsp; Replay</button>
+    <button class="btn" onclick="toggleTheme()">Dark&nbsp;/&nbsp;Light</button>
+  </div>
+</div>
+
+<div class="note">
+  <b>You were right about the chat mockup.</b> A screenshot of a conversation on a landing page
+  was everywhere in 2023 and now reads as dated &mdash; and worse, a <em>static</em> picture of
+  a chat proves nothing, because anyone can fake it. The four below sell the same thing without
+  the clich&eacute;: one is pure typography, one is an object, one shows voice without a chat UI,
+  and one lets people actually try it.
+</div>
+
+<!-- ======================= LANDING OPTIONS ======================= -->
+<section>
+  <div class="sec-head"><h2>1. Landing &mdash; four directions</h2><span class="tag">pick one</span></div>
+  <p class="sec-sub">All four use the same orb, palette and type you already have.</p>
+
+  <div class="opts">
+
+    <!-- A -->
+    <div class="opt">
+      <div class="opt-head">
+        <span class="verdict v-ok">Option A</span>
+        <h3>Editorial</h3>
+        <p>Almost no interface. One confident sentence in Fraunces, the orb reduced to a full
+          stop. Looks like a book cover, not an app store page. Cheapest to build.</p>
+      </div>
+      <div class="phone">
+        <div class="status"><span>5:35</span><span>&#9679;&#9679;&#9679;&nbsp; 46%</span></div>
+        <div class="screen edi stagger">
+          <p class="big">Some days you<br>just need<br>someone to<br>text<em>.</em><span class="dotmark"></span></p>
+          <p class="by">Not a chatbot. Not an assistant. Someone who remembers.</p>
+          <div class="cta">
+            <a class="go" href="#">Get started</a>
+            <a class="in" href="#">I have an account</a>
+            <p class="fine">Free. No card. 30 seconds.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B -->
+    <div class="opt">
+      <div class="opt-head">
+        <span class="verdict v-ok">Option B</span>
+        <h3>Ambient</h3>
+        <p>The orb <i>is</i> the page &mdash; big, breathing, with light drifting behind it.
+          Feels like an object you can talk to rather than a website. Strongest first
+          impression, weakest at explaining what it does.</p>
+      </div>
+      <div class="phone">
+        <div class="status"><span>5:35</span><span>&#9679;&#9679;&#9679;&nbsp; 46%</span></div>
+        <div class="screen amb stagger">
+          <div class="bigorb"></div>
+          <h2>Your Companion</h2>
+          <p>Here when you need it.<br>Quiet when you don't.</p>
+          <div class="cta" style="width:100%">
+            <a class="go" href="#">Get started</a>
+            <a class="in" href="#">I have an account</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- C -->
+    <div class="opt">
+      <div class="opt-head">
+        <span class="verdict v-best">Option C &mdash; my pick</span>
+        <h3>What people actually say</h3>
+        <p>Real messages cycle through in big type, with the companion's reply underneath.
+          It proves the voice &mdash; which is your whole advantage &mdash; without ever
+          drawing a chat screen. Three lines, 4.5s each.</p>
+      </div>
+      <div class="phone">
+        <div class="status"><span>5:35</span><span>&#9679;&#9679;&#9679;&nbsp; 46%</span></div>
+        <div class="screen rot stagger">
+          <div>
+            <p class="lead">People tell it</p>
+            <div class="cycler">
+              <div class="slide">
+                <p class="said">today was rough</p>
+                <p class="arrow">&darr;</p>
+                <p class="back">That sucks. What went down?</p>
+              </div>
+              <div class="slide">
+                <p class="said">nah I'm fine</p>
+                <p class="arrow">&darr;</p>
+                <p class="back">You say you're fine but you don't sound it &mdash; what's up?</p>
+              </div>
+              <div class="slide">
+                <p class="said">I still miss her</p>
+                <p class="arrow">&darr;</p>
+                <p class="back">Missing her is brutal. Six months isn't that long, you know.</p>
+              </div>
+            </div>
+          </div>
+          <div class="cta">
+            <a class="go" href="#">Get started</a>
+            <a class="in" href="#">I have an account</a>
+            <p class="fine">Free. No card. 30 seconds.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- D -->
+    <div class="opt">
+      <div class="opt-head">
+        <span class="verdict v-ok">Option D</span>
+        <h3>Try it before signing up</h3>
+        <p>A real input on the landing page. One free exchange, then the signup gate.
+          Converts best by a distance &mdash; but it needs an unauthenticated rate-limited
+          endpoint, so it is the only one with backend work.</p>
+      </div>
+      <div class="phone">
+        <div class="status"><span>5:35</span><span>&#9679;&#9679;&#9679;&nbsp; 46%</span></div>
+        <div class="screen try stagger">
+          <div>
+            <h2>Tell it something.<br>See how it answers.</h2>
+            <p class="hint">No account needed for the first one.</p>
+            <div class="livefield">
+              <span class="typed">today was rough</span><span class="caret"></span>
+            </div>
+            <div class="demo-reply">That sucks. What went down?</div>
+            <p class="gate">Keep going &mdash; it'll remember this.</p>
+          </div>
+          <div class="cta">
+            <a class="go" href="#">Continue</a>
+            <a class="in" href="#">I have an account</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="note" style="margin-top:34px">
+    <b>Why C.</b> You spent three sessions making this thing talk like a friend instead of an
+    assistant. That is the entire product and it is invisible in a screenshot. Option C puts
+    the actual words on screen at 25px where nobody can miss them, and because the lines are
+    short it works identically on a phone and a wide monitor. Option D converts better if you
+    are willing to build the endpoint &mdash; and <em>C and D combine</em>: cycle the lines,
+    then let the last one become a real input.
+  </div>
+</section>
+
+<!-- ============================ HOME ============================ -->
+<section>
+  <div class="sec-head"><h2>2. Home &mdash; with your changes</h2><span class="tag">revised</span></div>
+  <p class="sec-sub">
+    Continue-card dropped as you asked, and the greeting now leads with a question.
+    One note on that below.
+  </p>
+
+  <div style="display:grid;grid-template-columns:auto 1fr;gap:38px;align-items:start">
+    <div class="phone">
+      <div class="status"><span>5:35</span><span>&#9679;&#9679;&#9679;&nbsp; 46%</span></div>
+      <div class="screen stagger" style="overflow-y:auto;padding-bottom:84px">
+        <div class="hbar"><span class="ham">&#9776;</span><span class="ava">S</span></div>
+        <div>
+          <p class="greet">Evening, Saphin</p>
+          <p class="ask">What's on your mind today?</p>
+        </div>
+        <div>
+          <p class="overline">This week</p>
+          <div class="mood">
+            <span class="dot f2">M</span><span class="dot f1">T</span><span class="dot f1">W</span>
+            <span class="dot f3">T</span><span class="dot f2">F</span><span class="dot f1">S</span>
+            <span class="dot today">+</span>
+          </div>
+        </div>
+        <div>
+          <p class="overline">Start with</p>
+          <div class="chips">
+            <span class="chip hot">Just talk</span><span class="chip">Vent</span>
+            <span class="chip">Overthinking</span><span class="chip">Good news</span>
+          </div>
+        </div>
+        <div>
+          <p class="overline">Yours</p>
+          <div class="tiles">
+            <div class="tile"><div class="ic">&#127919;</div><b>Goals</b><span>2 active</span></div>
+            <div class="tile"><div class="ic">&#128214;</div><b>Journal</b><span>3 this week</span></div>
+          </div>
+        </div>
+        <div class="inputbar">
+          <div class="circ ghost">+</div>
+          <div class="field">Chat with Saphin&hellip;</div>
+          <div class="circ">&#127908;</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <p style="margin-top:0"><b>"What's on your mind today?" is now the hero line</b> &mdash;
+        Fraunces 21 in the accent colour, sitting right under the greeting. It asks instead of
+        announcing, which is the difference between a dashboard and a friend opening a
+        conversation.</p>
+
+      <p><b>Rotate it, don't fix it.</b> The same question every single evening becomes
+        wallpaper within a week &mdash; the exact problem we just fixed in the chat replies.
+        Vary it off data you already have:</p>
+      <ul style="color:var(--text-2);line-height:1.75">
+        <li>default &rarr; <i>"What's on your mind today?"</i></li>
+        <li>after a low week &rarr; <i>"How's your head today?"</i></li>
+        <li>after a good streak &rarr; <i>"What's good?"</i></li>
+        <li>first open in days &rarr; <i>"Been a while. What's new?"</i></li>
+        <li>late at night &rarr; <i>"Still up?"</i></li>
+      </ul>
+
+      <p><b>On dropping the continue card</b> &mdash; agreed for the default case, and the
+        screen is calmer without it. One exception worth keeping: if they were chatting
+        <em>within the last hour</em>, a single thin line under the question
+        (&ldquo;&#8249; back to this afternoon&rdquo;) costs almost no space and saves someone
+        who closed the app by accident. Your call &mdash; it's a two-line condition either way.</p>
+
+      <p><b>Everything else stays as you liked it:</b> mood week strip, starter chips wired to
+        <code>tone_context</code>, Goals and Journal tiles with live counts, input pinned
+        at the bottom.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ VOICE ============================ -->
+<section>
+  <div class="sec-head"><h2>3. Voice &mdash; the cancel button</h2><span class="tag">bug confirmed</span></div>
+  <p class="sec-sub">
+    It <b>does</b> exist &mdash; <code>cancelRecording</code> is wired to a trash icon at
+    <code>ChatInput.tsx:411</code>. You couldn't find it because it is a thin outline glyph on
+    a low-contrast background with no label, placed next to text shouting
+    &ldquo;tap to send&rdquo;. That is a discoverability bug, and it is worse than a missing
+    feature: people hold a recording they don't want and send it by accident.
+  </p>
+
+  <div class="vrow">
+    <div class="vcard">
+      <h3 class="bad">Now &mdash; what you saw</h3>
+      <p>Three controls, none labelled, two of which do the same thing (the pill and the send
+        button both stop and send). No timer, no waveform, no sign it is even picking up sound.</p>
+      <div class="vstage">
+        <div class="bar">
+          <span class="icbtn dim">&#128465;</span>
+          <span class="pill"><span class="recdot"></span> Recording... tap to send</span>
+          <span class="icbtn send">&#10148;</span>
+        </div>
+      </div>
+      <p style="color:var(--danger)">Cancel is the dim glyph on the far left.</p>
+    </div>
+
+    <div class="vcard">
+      <h3 class="good">Proposed &mdash; recording</h3>
+      <p>Cancel becomes a <b>labelled button with a danger outline</b>. A live waveform proves
+        the mic is working, and a timer shows how long they have (you auto-stop at
+        <code>MAX_RECORD_MS</code> and currently never warn them).</p>
+      <div class="vstage">
+        <div class="bar">
+          <span class="cancelbtn">&times; Cancel</span>
+          <span class="wave"><i style="height:7px"></i><i style="height:15px;animation-delay:.1s"></i><i style="height:21px;animation-delay:.2s"></i><i style="height:12px;animation-delay:.3s"></i><i style="height:18px;animation-delay:.4s"></i><i style="height:9px;animation-delay:.5s"></i><i style="height:16px;animation-delay:.6s"></i></span>
+          <span class="timer">0:12</span>
+          <span class="icbtn send">&#10148;</span>
+        </div>
+      </div>
+      <p>Word, not icon. Nobody has to guess.</p>
+    </div>
+
+    <div class="vcard">
+      <h3 class="good">Proposed &mdash; review before send</h3>
+      <p>The bigger win. Stop no longer sends &mdash; it gives them the clip back to play,
+        delete or send. Right now the only way to check a voice note is to send it.</p>
+      <div class="vstage">
+        <div class="bar" style="margin-bottom:9px">
+          <span class="icbtn">&#9654;</span>
+          <span class="wave still"><i style="height:7px"></i><i style="height:15px"></i><i style="height:21px"></i><i style="height:12px"></i><i style="height:18px"></i><i style="height:9px"></i><i style="height:16px"></i></span>
+          <span class="timer">0:12</span>
+        </div>
+        <div class="bar">
+          <span class="cancelbtn" style="flex:1;justify-content:center">&#128465; Delete</span>
+          <span class="icbtn send" style="width:auto;border-radius:999px;padding:0 18px;height:38px;font-weight:700;font-size:13.5px">Send &#10148;</span>
+        </div>
+      </div>
+      <p>Hold-to-talk also works: release sends, slide up cancels &mdash; but only <i>with</i>
+        a visible cancel, never instead of one.</p>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:28px">
+    <b>Three rules this follows.</b> A destructive action gets a word, not a glyph &mdash; an
+    unlabelled trash icon is a guess. One control, one job &mdash; today the pill and the send
+    button are duplicates while cancel hides in the corner. And never send media the user
+    hasn't heard back.
+  </div>
+</section>
+
+<footer>
+  <b>My recommendation:</b> Landing option <b>C</b>, the revised home exactly as drawn, and all
+  three voice changes &mdash; the labelled cancel is twenty minutes of work and removes a real
+  "I sent that by mistake" moment.
+  <br><br>
+  Both sample files live in <code>docs/</code>. No app code was modified for either.
+</footer>
+</div>
+
+<script>
+function toggleTheme(){
+  var r=document.documentElement;
+  r.setAttribute("data-theme", r.getAttribute("data-theme")==="dark"?"light":"dark");
+}
+function replay(){
+  document.querySelectorAll(".stagger").forEach(function(el){
+    el.classList.remove("stagger"); void el.offsetWidth; el.classList.add("stagger");
+  });
+}
+replay();
+</script>
+</body>
+</html>

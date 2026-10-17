@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Companion UI Sample</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===================================================================
+   Lamplight tokens - copied verbatim from
+   frontend/src/theme/themes/default/index.ts
+   =================================================================== */
+:root,
+:root[data-theme="dark"]{
+  --bg:#15110e; --surface:#221b16; --surface-alt:rgba(255,240,230,.09);
+  --text:#f6efe8; --text-2:#a89585; --accent:#e8956b; --accent-text:#241710;
+  --border:rgba(246,239,232,.11); --danger:#ef6b5e;
+  --bubble-user:#a05939; --bubble-user-text:#fff6f0;
+  --bubble-ai:#2a211b; --bubble-ai-text:#efe4da;
+  --page:#0d0a08; --panel:#1a1512;
+}
+:root[data-theme="light"]{
+  --bg:#faf6f1; --surface:#ffffff; --surface-alt:#f1e9e0;
+  --text:#2e2520; --text-2:#7a6b60; --accent:#ad5330; --accent-text:#fff8f3;
+  --border:rgba(46,37,32,.10); --danger:#b4342a;
+  --bubble-user:#ad5330; --bubble-user-text:#fff8f3;
+  --bubble-ai:#f1e9e0; --bubble-ai-text:#2e2520;
+  --page:#f2ece4; --panel:#fffdfa;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--page); color:var(--text);
+  font-family:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:15px; line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,.display{font-family:"Fraunces",Georgia,serif;font-weight:600;letter-spacing:-.3px}
+
+.wrap{max-width:1180px;margin:0 auto;padding:40px 16px 90px}
+
+/* ---------- page header ---------- */
+.top{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;margin-bottom:10px}
+.top h1{font-size:34px;line-height:1.15;margin:0}
+.sub{color:var(--text-2);max-width:62ch;margin:10px 0 0}
+.controls{display:flex;gap:8px;flex-wrap:wrap}
+.btn{
+  font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;
+  background:var(--surface);color:var(--text);
+  border:1px solid var(--border);border-radius:999px;padding:9px 16px;
+  transition:transform .12s ease, background .2s ease;
+}
+.btn:hover{background:var(--surface-alt)}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--accent);color:var(--accent-text);border-color:transparent}
+
+.note{
+  border-left:3px solid var(--accent); background:var(--surface);
+  padding:14px 18px; border-radius:0 12px 12px 0; margin:26px 0 0; color:var(--text-2);
+}
+.note b{color:var(--text)}
+
+/* ---------- section scaffold ---------- */
+section{margin-top:64px;padding-top:34px;border-top:1px solid var(--border)}
+.sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.sec-head h2{font-size:25px;margin:0}
+.tag{
+  font-size:11px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;
+  color:var(--accent);border:1px solid var(--border);border-radius:999px;padding:4px 10px;
+}
+.sec-sub{color:var(--text-2);margin:0 0 26px;max-width:68ch}
+
+.layout{display:grid;grid-template-columns:auto 1fr;gap:38px;align-items:start}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+
+/* ---------- phone frame ---------- */
+.phone{
+  width:330px;height:690px;border-radius:40px;background:var(--bg);
+  border:1px solid var(--border);
+  box-shadow:0 30px 70px rgba(0,0,0,.45), 0 0 0 9px var(--panel);
+  overflow:hidden;position:relative;display:flex;flex-direction:column;
+  margin:0 auto;
+}
+.status{
+  height:30px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;font-size:11px;color:var(--text-2);font-weight:600;
+}
+.screen{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
+
+/* numbered markers */
+.mk{
+  position:absolute;z-index:5;width:21px;height:21px;border-radius:50%;
+  background:var(--accent);color:var(--accent-text);
+  font-size:11px;font-weight:700;display:grid;place-items:center;
+  box-shadow:0 3px 10px rgba(0,0,0,.4);
+}
+
+/* annotation list */
+.notes{display:flex;flex-direction:column;gap:14px}
+.n{display:grid;grid-template-columns:24px 1fr;gap:12px;align-items:start}
+.n .num{
+  width:21px;height:21px;border-radius:50%;background:var(--accent);color:var(--accent-text);
+  font-size:11px;font-weight:700;display:grid;place-items:center;margin-top:2px;
+}
+.n p{margin:0;color:var(--text-2)}
+.n strong{color:var(--text);font-weight:600;display:block;font-size:15px}
+.n em{color:var(--accent);font-style:normal;font-weight:600}
+
+/* ===================================================================
+   LANDING
+   =================================================================== */
+.pad{padding:0 22px}
+.landing{justify-content:center;gap:0;padding:14px 0 26px;overflow-y:auto}
+
+.orb{
+  width:76px;height:76px;border-radius:50%;margin:0 auto 18px;
+  background:radial-gradient(circle at 34% 30%, #ffc49a, var(--accent) 58%, #7e3f23 100%);
+  box-shadow:0 0 44px rgba(232,149,107,.42);
+  animation:breathe 4.4s ease-in-out infinite;
+}
+@keyframes breathe{
+  0%,100%{transform:scale(1);box-shadow:0 0 40px rgba(232,149,107,.34)}
+  50%{transform:scale(1.055);box-shadow:0 0 62px rgba(232,149,107,.55)}
+}
+.wordmark{font-family:"Fraunces",serif;font-weight:600;font-size:32px;line-height:38px;text-align:center;margin:0}
+.tagline{text-align:center;color:var(--text-2);margin:8px 0 0;font-size:15px}
+
+.preview{
+  margin:24px 0 0;background:var(--surface);border:1px solid var(--border);
+  border-radius:20px;padding:15px 14px;
+}
+.preview-label{
+  font-size:11px;letter-spacing:1.1px;text-transform:uppercase;font-weight:600;
+  color:var(--text-2);margin:0 0 11px;
+}
+.feat{display:flex;gap:13px;align-items:flex-start;padding:11px 0}
+.feat-ic{
+  flex:0 0 auto;width:36px;height:36px;border-radius:11px;background:var(--surface-alt);
+  display:grid;place-items:center;font-size:17px;
+}
+.feat b{display:block;font-size:15px;font-weight:600}
+.feat span{color:var(--text-2);font-size:13.5px;line-height:1.45}
+
+.cta{display:flex;flex-direction:column;gap:10px;margin-top:22px}
+.cta a{
+  text-align:center;padding:15px;border-radius:15px;text-decoration:none;
+  font-weight:700;font-size:16px;
+}
+.cta .go{background:var(--accent);color:var(--accent-text)}
+.cta .in{border:1px solid var(--border);color:var(--text)}
+.fineprint{text-align:center;color:var(--text-2);font-size:12px;margin:15px 0 0}
+
+/* ---------- chat bubbles (shared) ---------- */
+.row{display:flex;margin-bottom:9px}
+.row.me{justify-content:flex-end}
+.bub{
+  max-width:80%;padding:10px 14px;border-radius:19px;font-size:15px;line-height:1.5;
+}
+.bub.ai{background:var(--bubble-ai);color:var(--bubble-ai-text);border-bottom-left-radius:7px}
+.bub.me{background:var(--bubble-user);color:var(--bubble-user-text);border-bottom-right-radius:7px}
+.bub.quote{border-left:3px solid var(--accent);border-bottom-left-radius:7px}
+.bub.quote i{display:block;font-style:italic;opacity:.92;margin:5px 0 3px}
+
+/* staggered entry */
+.stagger>*{opacity:0;transform:translateY(13px);animation:rise .55s cubic-bezier(.22,1,.36,1) forwards}
+.stagger>*:nth-child(1){animation-delay:.05s}
+.stagger>*:nth-child(2){animation-delay:.18s}
+.stagger>*:nth-child(3){animation-delay:.31s}
+.stagger>*:nth-child(4){animation-delay:.44s}
+.stagger>*:nth-child(5){animation-delay:.57s}
+.stagger>*:nth-child(6){animation-delay:.70s}
+.stagger>*:nth-child(7){animation-delay:.83s}
+@keyframes rise{to{opacity:1;transform:none}}
+
+/* typing dots */
+.typing{display:inline-flex;gap:4px;align-items:center;padding:13px 15px}
+.typing i{
+  width:6px;height:6px;border-radius:50%;background:var(--text-2);display:block;
+  animation:bounce 1.25s ease-in-out infinite;
+}
+.typing i:nth-child(2){animation-delay:.16s}
+.typing i:nth-child(3){animation-delay:.32s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-5px);opacity:1}}
+
+/* ===================================================================
+   HOME
+   =================================================================== */
+.home{overflow-y:auto;padding-bottom:84px}
+.hbar{display:flex;align-items:center;justify-content:space-between;padding:8px 20px 4px}
+.ham{font-size:21px;color:var(--text);line-height:1}
+.ava{
+  width:34px;height:34px;border-radius:50%;background:var(--accent);color:var(--accent-text);
+  display:grid;place-items:center;font-weight:700;font-size:14px;
+}
+.greet{font-family:"Fraunces",serif;font-weight:600;font-size:25px;line-height:31px;margin:16px 0 0}
+.greet-sub{color:var(--text-2);margin:3px 0 0;font-size:15px}
+
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:18px;
+  padding:14px 15px;margin-top:16px;
+}
+.card-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.card-top b{font-size:15px;font-weight:600}
+.card-top span{font-size:12px;color:var(--text-2)}
+.card p{margin:7px 0 0;color:var(--text-2);font-size:13.5px;line-height:1.5}
+
+.overline{
+  font-size:11px;letter-spacing:1.1px;text-transform:uppercase;font-weight:600;
+  color:var(--text-2);margin:24px 0 10px;
+}
+
+/* mood strip */
+.mood{display:flex;gap:9px;align-items:center}
+.dot{
+  width:30px;height:30px;border-radius:50%;display:grid;place-items:center;
+  font-size:10px;font-weight:600;color:var(--text-2);
+  border:1px solid var(--border);background:var(--surface);
+}
+.dot.f1{background:rgba(232,149,107,.22);color:var(--accent)}
+.dot.f2{background:rgba(232,149,107,.45);color:var(--accent-text)}
+.dot.f3{background:var(--accent);color:var(--accent-text)}
+.dot.today{border:1px dashed var(--accent);color:var(--accent);background:transparent}
+
+/* chips */
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{
+  border:1px solid var(--border);background:var(--surface);border-radius:999px;
+  padding:8px 14px;font-size:13.5px;font-weight:600;color:var(--text);
+}
+.chip.hot{background:var(--surface-alt);border-color:transparent}
+
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{
+  background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:13px;
+}
+.tile .ic{font-size:18px}
+.tile b{display:block;font-size:14px;font-weight:600;margin-top:7px}
+.tile span{font-size:12px;color:var(--text-2)}
+
+/* bottom input */
+.inputbar{
+  position:absolute;left:0;right:0;bottom:0;padding:11px 16px 16px;
+  background:linear-gradient(to top, var(--bg) 62%, transparent);
+  display:flex;gap:9px;align-items:center;
+}
+.field{
+  flex:1;display:flex;align-items:center;gap:9px;
+  background:var(--surface);border:1px solid var(--border);border-radius:999px;
+  padding:11px 16px;color:var(--text-2);font-size:14.5px;
+}
+.circ{
+  width:40px;height:40px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;
+  background:var(--accent);color:var(--accent-text);font-size:17px;
+}
+.circ.ghost{background:var(--surface);color:var(--text-2);border:1px solid var(--border)}
+
+/* ===================================================================
+   CHAT
+   =================================================================== */
+.chead{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:9px 18px 12px;border-bottom:1px solid var(--border);
+}
+.chead .back{color:var(--accent);font-size:14.5px;font-weight:600}
+.chead .who{text-align:center;line-height:1.2}
+.chead .who b{font-family:"Fraunces",serif;font-weight:600;font-size:17px;display:block}
+.chead .who span{font-size:11px;color:var(--text-2)}
+.thread{flex:1;overflow-y:auto;padding:16px 16px 84px}
+.daydiv{
+  text-align:center;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;
+  color:var(--text-2);font-weight:600;margin:4px 0 14px;
+}
+.stamp{font-size:11px;color:var(--text-2);margin:1px 4px 11px;text-align:right}
+.voice{display:flex;align-items:center;gap:9px}
+.wave{display:flex;gap:2.5px;align-items:center;height:20px}
+.wave i{width:2.5px;border-radius:2px;background:var(--bubble-user-text);opacity:.85;display:block;animation:wv 1.1s ease-in-out infinite}
+.wave i:nth-child(1){height:7px;animation-delay:0s}
+.wave i:nth-child(2){height:14px;animation-delay:.1s}
+.wave i:nth-child(3){height:19px;animation-delay:.2s}
+.wave i:nth-child(4){height:11px;animation-delay:.3s}
+.wave i:nth-child(5){height:16px;animation-delay:.4s}
+.wave i:nth-child(6){height:8px;animation-delay:.5s}
+@keyframes wv{0%,100%{transform:scaleY(.55)}50%{transform:scaleY(1)}}
+
+/* ===================================================================
+   ANIMATION SPEC
+   =================================================================== */
+.anim-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:16px}
+.acard{
+  background:var(--surface);border:1px solid var(--border);border-radius:18px;
+  padding:16px;display:flex;flex-direction:column;gap:11px;
+}
+.acard h3{margin:0;font-size:17px;font-family:"Figtree",sans-serif;font-weight:600;letter-spacing:0}
+.acard p{margin:0;color:var(--text-2);font-size:13.5px;line-height:1.5}
+.spec{
+  font-size:11.5px;color:var(--accent);font-weight:600;
+  border-top:1px solid var(--border);padding-top:10px;margin-top:auto;
+}
+.stage{
+  height:96px;border-radius:13px;background:var(--bg);border:1px solid var(--border);
+  display:grid;place-items:center;overflow:hidden;position:relative;
+}
+.mini-orb{
+  width:34px;height:34px;border-radius:50%;
+  background:radial-gradient(circle at 34% 30%,#ffc49a,var(--accent) 60%,#7e3f23);
+}
+.replay .mini-orb{animation:bloom 1.5s cubic-bezier(.22,1,.36,1)}
+@keyframes bloom{0%{transform:scale(.3);opacity:0}45%{opacity:1}100%{transform:scale(1);opacity:1}}
+.ring{
+  position:absolute;width:34px;height:34px;border-radius:50%;
+  border:2px solid var(--accent);opacity:0;
+}
+.replay .ring{animation:ripple 1.5s cubic-bezier(.22,1,.36,1)}
+@keyframes ripple{0%{transform:scale(.5);opacity:.85}100%{transform:scale(7);opacity:0}}
+
+.replay .demo-bub{animation:pop .45s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop{0%{transform:scale(.6) translateY(16px);opacity:0}100%{transform:none;opacity:1}}
+
+.replay .fill-dot{animation:fill .9s cubic-bezier(.22,1,.36,1)}
+@keyframes fill{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+
+.replay .slide-card{animation:slidein .6s cubic-bezier(.22,1,.36,1)}
+@keyframes slidein{0%{transform:translateX(34px);opacity:0}100%{transform:none;opacity:1}}
+
+.replay .press{animation:press 1s ease-in-out}
+@keyframes press{0%,100%{transform:scale(1)}18%{transform:scale(.94)}}
+
+table{width:100%;border-collapse:collapse;margin-top:18px;font-size:14px}
+th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:var(--text-2);font-weight:600}
+td code{
+  font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-size:12.5px;
+  background:var(--surface-alt);padding:2px 6px;border-radius:6px;color:var(--accent);
+}
+footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--border);color:var(--text-2);font-size:13.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <div>
+      <h1>Companion &mdash; UI&nbsp;/&nbsp;UX sample</h1>
+      <p class="sub">
+        Three screens drawn with your actual Lamplight tokens and the Fraunces&nbsp;/&nbsp;Figtree
+        scale. Nothing in the app has been changed &mdash; this is a proposal to look at.
+        Hit <b>Replay animations</b> to see the motion.
+      </p>
+    </div>
+    <div class="controls">
+      <button class="btn primary" onclick="replay()">&#9654;&nbsp; Replay animations</button>
+      <button class="btn" onclick="toggleTheme()">Dark&nbsp;/&nbsp;Light</button>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>The honest diagnosis first.</b> The palette and the type are genuinely good now &mdash;
+    that part is done. What the app is missing is <b>hierarchy</b> and <b>payoff</b>.
+    The landing page tells people what the app is instead of showing them, and the home
+    screen is a greeting plus a text box, so the whole product looks like one feature.
+    Everything below is about using data you <em>already store</em> &mdash; moods, goals,
+    journal entries, sessions &mdash; to make each screen feel lived-in.
+  </div>
+
+  <!-- ============================ LANDING ============================ -->
+  <section>
+    <div class="sec-head"><h2>1. Landing</h2><span class="tag">first 5 seconds</span></div>
+    <p class="sec-sub">
+      Right now a visitor reads three feature cards and has to imagine the product.
+      Let them watch it instead &mdash; a short conversation that types itself out sells
+      the register you spent three sessions building.
+    </p>
+
+    <div class="layout">
+      <div class="phone">
+        <div class="status"><span>5:35</span><span>&#9679;&#9679;&#9679;&nbsp; 46%</span></div>
+        <div class="screen landing pad stagger">
+          <div class="mk" style="top:62px;right:14px">1</div>
+          <div>
+            <div class="orb"></div>
+            <p class="wordmark">Your Companion</p>
+            <p class="tagline">A friend who remembers.</p>
+          </div>
+
+          <div class="preview" style="position:relative">
+            <div class="mk" style="top:-9px;right:-9px">2</div>
+            <p class="preview-label">A real conversation</p>
+            <div class="row me"><div class="bub me">today was rough</div></div>
+            <div class="row"><div class="bub ai">That sucks. What went down?</div></div>
+            <div class="row me"><div class="bub me">nah I'm fine</div></div>
+            <div class="row"><div class="bub ai">You say you're fine but you don't sound it &mdash; what's up?</div></div>
+          </div>
+
+          <div style="position:relative">
+            <div class="mk" style="top:6px;right:-9px">3</div>
+            <div class="feat">
+              <div class="feat-ic">&#128172;</div>
+              <div><b>Talks like a person</b><span>Short, warm, funny when it fits.</span></div>
+            </div>
+            <div class="feat">
+              <div class="feat-ic">&#129504;</div>
+              <div><b>Remembers you</b><span>Your people, your goals, what you're working on.</span></div>
+            </div>
+            <div class="feat">
+              <div class="feat-ic">&#128274;</div>
+              <div><b>Stays yours</b><span>Private by default. Delete anything, anytime.</span></div>
+            </div>
+          </div>
+
+          <div class="cta" style="position:relative">
+            <div class="mk" style="top:-9px;right:-9px">4</div>
+            <a class="go" href="#">Get started</a>
+            <a class="in" href="#">I already have an account</a>
+            <p class="fineprint">Free. No card. 30 seconds.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <div class="n"><div class="num">1</div><p><strong>The orb breathes</strong>
+          A slow 4.4s scale loop, nothing else. It makes the screen feel awake instead of
+          printed, and it costs one <em>transform</em> &mdash; no layout, no battery.</p></div>
+        <div class="n"><div class="num">2</div><p><strong>Show the product, don't describe it</strong>
+          This is the single biggest change on the page. Four bubbles that type themselves
+          out demonstrate the voice instantly. Use your <em>real</em> replies &mdash; the
+          "you don't sound fine" one is the whole pitch in one line.</p></div>
+        <div class="n"><div class="num">3</div><p><strong>Three claims, not three paragraphs</strong>
+          Keep the feature rows, shorten them hard. One bold line, one grey line. People
+          scan this, they don't read it.</p></div>
+        <div class="n"><div class="num">4</div><p><strong>Kill the friction line</strong>
+          "Free. No card. 30 seconds." under the button answers the three questions
+          everyone has before tapping. Secondary action stays a ghost button so there is
+          exactly one obvious path.</p></div>
+        <div class="n"><div class="num">&#9679;</div><p><strong>Desktop</strong>
+          Session 23 noted the desktop view runs ~60% empty. Two columns fixes it &mdash;
+          copy and CTA left, the live conversation preview right, at
+          <em>max-width 1040px</em>. Don't stretch the phone layout.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================= HOME ============================== -->
+  <section>
+    <div class="sec-head"><h2>2. Home, after login</h2><span class="tag">biggest opportunity</span></div>
+    <p class="sec-sub">
+      Today this is a greeting and a text box, with recent chats hidden in the drawer.
+      Everything below already exists in your database &mdash; sessions, mood logs, goals,
+      journal entries. Surfacing it turns a blank page into a reason to open the app.
+    </p>
+
+    <div class="layout">
+      <div class="phone">
+        <div class="status"><span>5:35</span><span>&#9679;&#9679;&#9679;&nbsp; 46%</span></div>
+        <div class="screen home pad stagger">
+          <div class="hbar"><span class="ham">&#9776;</span><span class="ava">S</span></div>
+
+          <div style="position:relative">
+            <div class="mk" style="top:14px;right:-9px">1</div>
+            <p class="greet">Evening, Saphin</p>
+            <p class="greet-sub">How's your head today?</p>
+          </div>
+
+          <div class="card" style="position:relative">
+            <div class="mk" style="top:-9px;right:-9px">2</div>
+            <div class="card-top"><b>Pick up where you left off</b><span>2h ago</span></div>
+            <p>&ldquo;You say you're fine but you don't really sound it &mdash; what's up?&rdquo;</p>
+          </div>
+
+          <p class="overline">This week</p>
+          <div class="mood" style="position:relative">
+            <div class="mk" style="top:-13px;right:-9px">3</div>
+            <span class="dot f2">M</span><span class="dot f1">T</span>
+            <span class="dot f1">W</span><span class="dot f3">T</span>
+            <span class="dot f2">F</span><span class="dot f1">S</span>
+            <span class="dot today">+</span>
+          </div>
+
+          <p class="overline">Start with</p>
+          <div class="chips" style="position:relative">
+            <div class="mk" style="top:-13px;right:-9px">4</div>
+            <span class="chip hot">Just talk</span>
+            <span class="chip">Vent</span>
+            <span class="chip">Overthinking</span>
+            <span class="chip">Good news</span>
+          </div>
+
+          <p class="overline">Yours</p>
+          <div class="tiles" style="position:relative">
+            <div class="mk" style="top:-13px;right:-9px">5</div>
+            <div class="tile"><div class="ic">&#127919;</div><b>Goals</b><span>2 active</span></div>
+            <div class="tile"><div class="ic">&#128214;</div><b>Journal</b><span>3 this week</span></div>
+          </div>
+
+          <div class="inputbar">
+            <div class="circ ghost">+</div>
+            <div class="field">Chat with Saphin&hellip;</div>
+            <div class="circ">&#127908;</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <div class="n"><div class="num">1</div><p><strong>Greeting that knows the time</strong>
+          "Evening, Saphin" in Fraunces 25. The second line changes with their recent mood
+          &mdash; <em>"How's your head today?"</em> after a rough week, <em>"What's good?"</em>
+          after a bright one. One query you already run.</p></div>
+        <div class="n"><div class="num">2</div><p><strong>Continue the last chat</strong>
+          The highest-value element on the screen and currently buried in a drawer. Show the
+          last companion line so re-entry costs nothing. If there is no recent chat, this
+          card is simply absent &mdash; never show an empty state here.</p></div>
+        <div class="n"><div class="num">3</div><p><strong>Mood week strip</strong>
+          You log moods already and the user never sees them. Seven dots, opacity by
+          intensity, today's is a dashed <em>+</em>. Tapping it logs a mood without typing.
+          This is what makes the app feel like it is keeping track <em>for</em> them.</p></div>
+        <div class="n"><div class="num">4</div><p><strong>Starter chips</strong>
+          The blank text box is the hardest part of any companion app. Four chips remove it,
+          and each one can prefill <em>tone_context</em> &mdash; "Vent" opens in the low
+          register, "Good news" in the playful one. You have that plumbing already.</p></div>
+        <div class="n"><div class="num">5</div><p><strong>Goals and Journal as tiles, with counts</strong>
+          A count ("2 active") is the difference between a nav link and something that pulls
+          you in. Reminders can be a third tile, or a row underneath.</p></div>
+        <div class="n"><div class="num">&#9679;</div><p><strong>Desktop</strong>
+          Keep the sidebar, then go two columns: continue-card plus chips left, mood and
+          tiles right. The input bar stays pinned bottom-centre at
+          <em>max-width 720px</em> so it never stretches across a wide monitor.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================= CHAT ============================== -->
+  <section>
+    <div class="sec-head"><h2>3. Chat</h2><span class="tag">where people live</span></div>
+    <p class="sec-sub">
+      The closest to finished of the three. What it needs is breathing room, a sense that
+      someone is on the other end, and a quiet visual home for the rare quote moment.
+    </p>
+
+    <div class="layout">
+      <div class="phone">
+        <div class="status"><span>5:35</span><span>&#9679;&#9679;&#9679;&nbsp; 46%</span></div>
+        <div class="screen">
+          <div class="chead" style="position:relative">
+            <div class="mk" style="top:40px;right:14px">1</div>
+            <span class="back">&#8249; Chats</span>
+            <span class="who"><b>Companion</b><span>warm &middot; remembers you</span></span>
+            <span style="color:var(--text-2)">&#8942;</span>
+          </div>
+
+          <div class="thread stagger">
+            <p class="daydiv">Today</p>
+
+            <div class="row me"><div class="bub me">Today I am feeling bit depressed</div></div>
+            <div class="row"><div class="bub ai">That sucks, man. Anything in particular weighing on you?</div></div>
+            <div class="row me"><div class="bub me">I still miss her</div></div>
+
+            <div class="row" style="position:relative">
+              <div class="mk" style="top:-9px;right:6px">2</div>
+              <div class="bub ai quote">
+                Missing her is brutal, and it reminds me of something I read &mdash;
+                <i>&ldquo;Grief is the price we pay for love.&rdquo;</i>
+                That ache is just how much she mattered.
+              </div>
+            </div>
+            <p class="stamp">5:34 pm</p>
+
+            <div class="row me" style="position:relative">
+              <div class="mk" style="top:-9px;left:6px">3</div>
+              <div class="bub me voice">
+                <span>&#9654;</span>
+                <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+                <span style="font-size:12px;opacity:.85">0:12</span>
+              </div>
+            </div>
+
+            <div class="row" style="position:relative">
+              <div class="mk" style="top:-9px;right:6px">4</div>
+              <div class="bub ai typing"><i></i><i></i><i></i></div>
+            </div>
+          </div>
+
+          <div class="inputbar">
+            <div class="circ ghost">+</div>
+            <div class="field">Type a message&hellip;</div>
+            <div class="circ">&#127908;</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <div class="n"><div class="num">1</div><p><strong>Give the header a voice</strong>
+          "Companion" in Fraunces with a quiet subtitle underneath &mdash; the personality
+          mode they picked (<em>warm &middot; remembers you</em>). It reminds them this
+          thing has a character, and it makes the mode switcher discoverable.</p></div>
+        <div class="n"><div class="num">2</div><p><strong>A home for the quote</strong>
+          Now that a quote is rare and real, mark it: a 3px accent bar down the bubble edge
+          and the line itself in italics. It reads as a moment rather than decoration
+          &mdash; and because the gate only opens roughly once per conversation, this
+          treatment stays special.</p></div>
+        <div class="n"><div class="num">3</div><p><strong>Voice notes should look like voice notes</strong>
+          A play triangle, a waveform, a duration. Right now a transcript just appears as
+          text and the user loses the fact that they spoke.</p></div>
+        <div class="n"><div class="num">4</div><p><strong>Typing indicator</strong>
+          Three bouncing dots in an empty companion bubble, shown the moment the request
+          leaves. Groq can take a couple of seconds; without this the app feels broken and
+          people re-send. <em>Highest value / lowest effort item on this page.</em></p></div>
+        <div class="n"><div class="num">&#9679;</div><p><strong>Smaller things that add up</strong>
+          Day dividers ("Today", "Yesterday"); timestamps only on the last message of a
+          group, not every bubble; bubble max-width 80% so lines stay readable;
+          <em>7px</em> corner on the tail side and <em>19px</em> elsewhere so direction reads
+          at a glance.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================== ANIMATION =========================== -->
+  <section>
+    <div class="sec-head"><h2>4. Animation</h2><span class="tag">answer: yes, but only five</span></div>
+    <p class="sec-sub">
+      You have one animation today (the orb bloom at launch) and it is good. Below are the
+      five worth adding. All are <b>transform and opacity only</b> with
+      <code>useNativeDriver:&nbsp;true</code> &mdash; the same constraint Session 23 set, so
+      none of them needs <code>reanimated</code> or a dev build. Anything animating width,
+      height or colour is off the list on purpose.
+    </p>
+
+    <div class="anim-grid">
+      <div class="acard">
+        <div class="stage"><span class="ring"></span><span class="mini-orb"></span></div>
+        <h3>1. Launch bloom</h3>
+        <p><b>Already built.</b> Keep it exactly as is. It fills a wait that already
+          existed, so it costs no time.</p>
+        <div class="spec">scale .3&rarr;1 &middot; ring ripple &middot; 1500ms</div>
+      </div>
+
+      <div class="acard">
+        <div class="stage"><span class="bub ai demo-bub" style="max-width:none">Nice one.</span></div>
+        <h3>2. Message arrival</h3>
+        <p>Each bubble pops in with a slight overshoot instead of appearing. Sent messages
+          rise from the input, replies fade in from the left.</p>
+        <div class="spec">scale .6&rarr;1 + translateY 16&rarr;0 &middot; 450ms &middot; spring</div>
+      </div>
+
+      <div class="acard">
+        <div class="stage"><span class="bub ai typing" style="margin:0"><i></i><i></i><i></i></span></div>
+        <h3>3. Typing dots</h3>
+        <p>The one that changes how the app <i>feels</i> most. Show it the instant the
+          request is sent, never after a delay.</p>
+        <div class="spec">3 dots &middot; translateY -5px &middot; 1250ms loop &middot; 160ms stagger</div>
+      </div>
+
+      <div class="acard">
+        <div class="stage"><span class="dot f3 fill-dot" style="width:38px;height:38px">T</span></div>
+        <h3>4. Mood dot fill</h3>
+        <p>When they log a mood, the dot fills and settles. A small reward for a small
+          action &mdash; this is what makes people do it again tomorrow.</p>
+        <div class="spec">scale .4&rarr;1.12&rarr;1 &middot; 900ms</div>
+      </div>
+
+      <div class="acard">
+        <div class="stage">
+          <span class="card slide-card" style="margin:0;padding:10px 12px;font-size:13px">Pick up where you left off</span>
+        </div>
+        <h3>5. Screen transitions</h3>
+        <p>Home&rarr;Chat slides in from the right, back slides out. Gives the app a sense
+          of place instead of hard cuts between screens.</p>
+        <div class="spec">translateX 34&rarr;0 + fade &middot; 600ms &middot; ease-out</div>
+      </div>
+
+      <div class="acard">
+        <div class="stage"><span class="chip press">Just talk</span></div>
+        <h3>6. Press feedback</h3>
+        <p>Every chip, tile and button dips slightly on touch. Nearly invisible, and its
+          absence is exactly why an app feels dead.</p>
+        <div class="spec">scale 1&rarr;.94&rarr;1 &middot; 120ms down</div>
+      </div>
+    </div>
+
+    <table>
+      <thead><tr><th>Do</th><th>Don't</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Animate <code>transform</code> and <code>opacity</code> only.</td>
+          <td>Animate width, height, colour or shadow &mdash; those run on the JS thread and stutter on cheap phones.</td>
+        </tr>
+        <tr>
+          <td>Keep everything under <code>600ms</code>. Feedback under <code>150ms</code>.</td>
+          <td>Long cinematic intros. They are charming once and infuriating by the fifth launch.</td>
+        </tr>
+        <tr>
+          <td>Let motion be interruptible &mdash; a tap mid-animation jumps to the end.</td>
+          <td>Block input while something is moving.</td>
+        </tr>
+        <tr>
+          <td>Respect <code>AccessibilityInfo.isReduceMotionEnabled()</code> and fall back to a plain fade.</td>
+          <td>Assume everyone wants motion.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    <b>If you only do three things:</b> the typing indicator in chat, the
+    continue-where-you-left-off card on home, and the live conversation preview on landing.
+    Those three change how the product reads more than the other nine combined.
+    <br><br>
+    Nothing in <code>frontend/</code> or <code>backend/</code> was modified to make this file.
+  </footer>
+</div>
+
+<script>
+function toggleTheme(){
+  var r = document.documentElement;
+  r.setAttribute("data-theme", r.getAttribute("data-theme") === "dark" ? "light" : "dark");
+}
+function replay(){
+  // Re-trigger every CSS animation by detaching and reattaching the classes.
+  document.querySelectorAll(".stagger").forEach(function(el){
+    el.classList.remove("stagger"); void el.offsetWidth; el.classList.add("stagger");
+  });
+  document.querySelectorAll(".acard .stage").forEach(function(el){
+    el.classList.remove("replay"); void el.offsetWidth; el.classList.add("replay");
+  });
+}
+replay();
+</script>
+</body>
+</html>

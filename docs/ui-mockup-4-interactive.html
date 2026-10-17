@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clickable Home Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root,:root[data-theme="dark"]{
+  --bg:#15110e;--surface:#221b16;--surface-alt:rgba(255,240,230,.09);
+  --text:#f6efe8;--text-2:#a89585;--accent:#e8956b;--accent-text:#241710;
+  --border:rgba(246,239,232,.11);--danger:#ef6b5e;
+  --bubble-user:#a05939;--bubble-user-text:#fff6f0;
+  --bubble-ai:#2a211b;--bubble-ai-text:#efe4da;--page:#0d0a08;--panel:#1a1512;
+}
+:root[data-theme="light"]{
+  --bg:#faf6f1;--surface:#ffffff;--surface-alt:#f1e9e0;
+  --text:#2e2520;--text-2:#7a6b60;--accent:#ad5330;--accent-text:#fff8f3;
+  --border:rgba(46,37,32,.10);--danger:#b4342a;
+  --bubble-user:#ad5330;--bubble-user-text:#fff8f3;
+  --bubble-ai:#f1e9e0;--bubble-ai-text:#2e2520;--page:#f2ece4;--panel:#fffdfa;
+}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--page);color:var(--text);font-family:"Figtree",system-ui,sans-serif;
+  font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:38px 16px 80px}
+h1,h2{font-family:"Fraunces",Georgia,serif;font-weight:600;letter-spacing:-.3px}
+.top{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between}
+.top h1{font-size:32px;line-height:1.15;margin:0}
+.sub{color:var(--text-2);max-width:66ch;margin:10px 0 0}
+.btn{font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;background:var(--surface);
+  color:var(--text);border:1px solid var(--border);border-radius:999px;padding:9px 16px}
+.btn.primary{background:var(--accent);color:var(--accent-text);border-color:transparent}
+.controls{display:flex;gap:8px}
+.banner{border-left:3px solid var(--accent);background:var(--surface);padding:14px 18px;
+  border-radius:0 12px 12px 0;margin:24px 0 32px;color:var(--text-2)}
+.banner b{color:var(--text)}
+
+.stage{display:grid;grid-template-columns:auto 1fr;gap:40px;align-items:start}
+@media(max-width:880px){.stage{grid-template-columns:1fr}}
+
+.phone{width:322px;height:662px;border-radius:38px;background:var(--bg);border:1px solid var(--border);
+  box-shadow:0 26px 60px rgba(0,0,0,.45),0 0 0 8px var(--panel);overflow:hidden;
+  position:relative;display:flex;flex-direction:column;margin:0 auto}
+.status{height:28px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;font-size:11px;color:var(--text-2);font-weight:600}
+.view{flex:1;min-height:0;position:relative;display:none;flex-direction:column}
+.view.on{display:flex;animation:slidein .34s cubic-bezier(.22,1,.36,1)}
+@keyframes slidein{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}
+.scroll{flex:1;overflow-y:auto;padding:0 22px 86px}
+
+.hbar{display:flex;align-items:center;justify-content:space-between;padding:8px 0 4px}
+.ham{font-size:21px;color:var(--text-2)}
+.ava{width:34px;height:34px;border-radius:50%;background:var(--accent);color:var(--accent-text);
+  display:grid;place-items:center;font-weight:700;font-size:14px}
+.greet{font-family:"Fraunces",serif;font-weight:600;font-size:25px;line-height:31px;margin:18px 0 0}
+.ask{font-family:"Fraunces",serif;font-weight:600;font-size:21px;line-height:28px;color:var(--accent);margin:4px 0 0}
+.overline{font-size:11px;letter-spacing:1.1px;text-transform:uppercase;font-weight:600;
+  color:var(--text-2);margin:26px 0 10px;display:flex;align-items:center;gap:7px}
+.hintdot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:ping 2s ease-in-out infinite}
+@keyframes ping{50%{opacity:.25}}
+
+.mood{display:flex;gap:9px}
+.dot{width:31px;height:31px;border-radius:50%;display:grid;place-items:center;font-size:10px;
+  font-weight:600;color:var(--text-2);border:1px solid var(--border);background:var(--surface);
+  cursor:pointer;transition:transform .14s}
+.dot:hover{transform:scale(1.12)}
+.dot:active{transform:scale(.93)}
+.dot.f1{background:rgba(232,149,107,.22);color:var(--accent)}
+.dot.f2{background:rgba(232,149,107,.45);color:var(--accent-text)}
+.dot.f3{background:var(--accent);color:var(--accent-text)}
+.dot.today{border:1px dashed var(--accent);color:var(--accent);background:transparent}
+.dot.sel{outline:2px solid var(--accent);outline-offset:2px}
+
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--border);background:var(--surface);border-radius:999px;
+  padding:9px 15px;font-size:13.5px;font-weight:600;cursor:pointer;transition:transform .14s,background .2s}
+.chip:hover{background:var(--surface-alt)}
+.chip:active{transform:scale(.94)}
+.chip.hot{background:var(--surface-alt);border-color:transparent}
+
+.inputbar{position:absolute;left:0;right:0;bottom:0;padding:11px 20px 16px;
+  background:linear-gradient(to top,var(--bg) 62%,transparent);display:flex;gap:9px;align-items:center}
+.field{flex:1;display:flex;align-items:center;background:var(--surface);border:1px solid var(--border);
+  border-radius:999px;padding:11px 16px;color:var(--text-2);font-size:14.5px}
+.circ{width:40px;height:40px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;
+  background:var(--accent);color:var(--accent-text);font-size:17px}
+.circ.ghost{background:var(--surface);color:var(--text-2);border:1px solid var(--border)}
+
+/* sheet */
+.veil{position:absolute;inset:0;background:rgba(10,6,4,.6);opacity:0;pointer-events:none;
+  transition:opacity .24s;z-index:8}
+.veil.on{opacity:1;pointer-events:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);
+  border-top:1px solid var(--border);border-radius:22px 22px 0 0;padding:20px 22px 26px;
+  transform:translateY(102%);transition:transform .3s cubic-bezier(.22,1,.36,1);z-index:9}
+.sheet.on{transform:none}
+.grip{width:36px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 15px}
+.sheet h4{margin:0;font-size:17px;font-family:"Fraunces",serif;font-weight:600}
+.sheet .when{color:var(--text-2);font-size:12.5px;margin:3px 0 13px}
+.sheet p{margin:0 0 14px;color:var(--text-2);font-size:14px;line-height:1.5}
+.sheet .act{display:block;text-align:center;background:var(--surface-alt);border-radius:13px;
+  padding:12px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px}
+.sheet .act.main{background:var(--accent);color:var(--accent-text)}
+.chatlist{margin:0 0 14px;border-top:1px solid var(--border)}
+.chatrow{display:flex;align-items:center;gap:11px;padding:11px 2px;border-bottom:1px solid var(--border);
+  cursor:pointer}
+.chatrow:hover{background:var(--surface-alt)}
+.chatrow .ch{color:var(--accent);font-size:15px;flex:0 0 auto}
+.chatrow b{flex:1;font-size:14.5px;font-weight:600}
+.chatrow b i{font-style:italic;font-weight:400;color:var(--text-2)}
+.chatrow span{font-size:12px;color:var(--text-2);flex:0 0 auto}
+
+/* chat view */
+.chead{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:9px 20px 12px;border-bottom:1px solid var(--border);flex:0 0 auto}
+.chead .bk{color:var(--accent);font-size:14.5px;font-weight:600;cursor:pointer}
+.chead .who b{font-family:"Fraunces",serif;font-weight:600;font-size:17px;display:block;text-align:center}
+.chead .who span{font-size:11px;color:var(--text-2)}
+.thread{flex:1;overflow-y:auto;padding:18px 18px 86px}
+.row{display:flex;margin-bottom:9px}
+.row.me{justify-content:flex-end}
+.bub{max-width:80%;padding:10px 14px;border-radius:19px;font-size:15px;line-height:1.5;
+  animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop{from{opacity:0;transform:scale(.7) translateY(12px)}to{opacity:1;transform:none}}
+.bub.ai{background:var(--bubble-ai);color:var(--bubble-ai-text);border-bottom-left-radius:7px}
+.bub.me{background:var(--bubble-user);color:var(--bubble-user-text);border-bottom-right-radius:7px}
+.typing{display:inline-flex;gap:4px;align-items:center;padding:14px 16px}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--text-2);display:block;
+  animation:bounce 1.25s ease-in-out infinite}
+.typing i:nth-child(2){animation-delay:.16s}.typing i:nth-child(3){animation-delay:.32s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-5px);opacity:1}}
+
+/* explainer panel */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:22px}
+.panel h3{margin:0 0 4px;font-size:19px;font-weight:600}
+.panel .lead{color:var(--text-2);margin:0 0 18px;font-size:14px}
+.ev{border-left:3px solid var(--accent);padding:2px 0 2px 15px;margin-bottom:20px;
+  animation:fadein .3s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.ev b{display:block;font-size:15px;margin-bottom:5px}
+.ev p{margin:0 0 9px;color:var(--text-2);font-size:14px;line-height:1.55}
+.cost{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;
+  border-radius:999px;padding:4px 11px;letter-spacing:.3px}
+.cost.free{background:rgba(232,149,107,.18);color:var(--accent)}
+.cost.work{background:rgba(239,107,94,.16);color:var(--danger)}
+code{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;background:var(--surface-alt);
+  padding:2px 6px;border-radius:6px;color:var(--accent)}
+table{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px}
+th,td{text-align:left;padding:10px 11px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:var(--text-2);font-weight:600}
+section{margin-top:56px;padding-top:30px;border-top:1px solid var(--border)}
+section h2{font-size:24px;margin:0 0 6px}
+section .sx{color:var(--text-2);margin:0 0 20px;max-width:70ch}
+footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--border);color:var(--text-2);font-size:13.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="top">
+  <div>
+    <h1>Clickable &mdash; try the dots and the chips</h1>
+    <p class="sub">
+      Easier to show than describe. Tap any mood dot, or any chip. The panel on the right
+      explains what just happened and what it would cost to build for real.
+    </p>
+  </div>
+  <div class="controls">
+    <button class="btn" onclick="toggleTheme()">Dark&nbsp;/&nbsp;Light</button>
+    <button class="btn primary" onclick="goHome()">&#8635;&nbsp; Reset</button>
+  </div>
+</div>
+
+<div class="banner">
+  <b>Short answers:</b> Yes, both are clickable. The <b>chips</b> cost nothing &mdash; the
+  function they need (<code>onStartChatWithMessage</code>) already exists and is already wired
+  up in <code>App.tsx</code>. The <b>mood strip</b> needs backend work: you log moods to the
+  database on every message, but there is no endpoint to read them back and no UI anywhere.
+  Details below.
+</div>
+
+<div class="stage">
+
+  <div class="phone">
+    <div class="status"><span>5:35</span><span>&#9679;&#9679;&#9679;&nbsp; 46%</span></div>
+
+    <!-- HOME -->
+    <div class="view on" id="v-home">
+      <div class="scroll">
+        <div class="hbar"><span class="ham">&#9776;</span><span class="ava">S</span></div>
+        <p class="greet">Evening, Saphin</p>
+        <p class="ask">What's on your mind today?</p>
+
+        <p class="overline"><span class="hintdot"></span> Last 7 days &mdash; tap a dot</p>
+        <div class="mood" id="mood"></div>
+
+        <p class="overline"><span class="hintdot"></span> Start with &mdash; tap a chip</p>
+        <div class="chips">
+          <span class="chip hot" onclick="startChip('talk')">Just talk</span>
+          <span class="chip" onclick="startChip('vent')">Vent</span>
+          <span class="chip" onclick="startChip('over')">Overthinking</span>
+          <span class="chip" onclick="startChip('good')">Good news</span>
+        </div>
+      </div>
+      <div class="inputbar">
+        <div class="circ ghost">+</div><div class="field">Chat with Saphin&hellip;</div>
+        <div class="circ">&#127908;</div>
+      </div>
+    </div>
+
+    <!-- CHAT -->
+    <div class="view" id="v-chat">
+      <div class="chead">
+        <span class="bk" onclick="goHome()">&#8249; Chats</span>
+        <span class="who"><b>Companion</b><span>warm &middot; remembers you</span></span>
+        <span style="color:var(--text-2)">&#8942;</span>
+      </div>
+      <div class="thread" id="thread"></div>
+      <div class="inputbar">
+        <div class="circ ghost">+</div><div class="field">Type a message&hellip;</div>
+        <div class="circ">&#127908;</div>
+      </div>
+    </div>
+
+    <div class="veil" id="veil" onclick="closeSheet()"></div>
+    <div class="sheet" id="sheet">
+      <div class="grip"></div>
+      <h4 id="sh-title">Thursday</h4>
+      <p class="when" id="sh-when"></p>
+      <div class="chatlist" id="sh-list"></div>
+      <p id="sh-body"></p>
+      <span class="act main" id="sh-a1" onclick="closeSheet()"></span>
+      <span class="act" onclick="closeSheet()">Close</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>What just happened</h3>
+    <p class="lead">Tap something on the phone &mdash; this updates.</p>
+    <div id="explain">
+      <div class="ev">
+        <b>Nothing yet</b>
+        <p>Start with a mood dot. Then try &ldquo;Vent&rdquo;.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== THE TWO ANSWERS ===================== -->
+<section>
+  <h2>1. &ldquo;This week&rdquo; &mdash; what it is</h2>
+  <p class="sx">
+    Seven dots, Monday to today. Each one is <b>that day's mood</b>, and the colour gets
+    stronger with intensity. It is not something you fill in &mdash; it fills itself.
+  </p>
+
+  <table>
+    <thead><tr><th style="width:30%">Thing</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><b>How a dot gets filled</b></td>
+        <td>Automatically. <code>detect_mood()</code> already runs on <i>every message you
+          send</i> and writes the result to <code>mood_logs</code>. You have been collecting
+          this data the whole time &mdash; it has just never been shown to anyone.</td></tr>
+      <tr><td><b>Colour</b></td>
+        <td>Opacity by intensity (1&ndash;5). Pale = a mild day, solid accent = a strong one.
+          No red/green &mdash; this is a memory, not a scorecard.</td></tr>
+      <tr><td><b>Tapping a past day</b></td>
+        <td>Opens a small sheet: what the day felt like and how many times you talked, with a
+          shortcut to that day's chat.</td></tr>
+      <tr><td><b>Today's dashed +</b></td>
+        <td>Means nothing logged yet today. It fills the moment you send your first message.
+          Tapping it just opens the chat.</td></tr>
+      <tr><td><b>Why it's worth having</b></td>
+        <td>It is the one screen element that proves the app is paying attention. Everything
+          else you have to ask for; this just appears.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="banner" style="margin-top:24px">
+    <b>Cost, honestly.</b> This is the only thing I have proposed that is not free.
+    <code>mood_repository.py</code> has exactly one function &mdash; <code>add_mood_log</code>.
+    There is no read, no endpoint, and <code>grep</code> finds no mention of mood anywhere in
+    the frontend. You would need: a <code>list_recent_moods(user_id, days=7)</code> repo
+    function, a <code>GET /moods/week</code> endpoint, and the strip. Maybe an hour of backend,
+    an hour of frontend. <b>Everything else on this screen is free.</b>
+  </div>
+</section>
+
+<section>
+  <h2>2. The chips &mdash; what they do</h2>
+  <p class="sx">
+    They open a new chat that has already started. The blank text box is the hardest moment in
+    any companion app, and these remove it.
+  </p>
+
+  <table>
+    <thead><tr><th style="width:21%">Chip</th><th style="width:34%">Sends</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td><b>Just talk</b></td><td><i>nothing &mdash; opens an empty chat</i></td>
+        <td>The normal path, kept as the default so the chips never feel compulsory.</td></tr>
+      <tr><td><b>Vent</b></td><td>&ldquo;I need to vent about something&rdquo;</td>
+        <td>Tells the mood detector straight away that this is a low conversation, so the
+          register starts right instead of warming up over three messages.</td></tr>
+      <tr><td><b>Overthinking</b></td><td>&ldquo;I can't stop overthinking&rdquo;</td>
+        <td>Your single most common message, judging by the screenshots you sent me.</td></tr>
+      <tr><td><b>Good news</b></td><td>&ldquo;I've got good news&rdquo;</td>
+        <td>Opens in the playful register. Right now nothing in the app invites a good mood
+          &mdash; it is built entirely around bad days.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="banner" style="margin-top:24px">
+    <b>These are free.</b> <code>ChatsListScreen</code> already takes
+    <code>onStartChatWithMessage(text)</code> and <code>App.tsx</code> already handles it.
+    A chip is four lines of JSX calling a function you wrote in an earlier session.
+    <br><br>
+    <b>The nicer version, later:</b> rather than sending visible text, pass a
+    <code>tone_hint</code> on the chat request so the register is set without a fake message
+    appearing in the thread. That needs a backend field &mdash; worth doing once the chips
+    prove they get used, not before.
+  </div>
+</section>
+
+<section>
+  <h2>3. Timezone &mdash; don't hardcode Nepal, don't remove it</h2>
+  <p class="sx">
+    The phone already knows where it is. Group the days <b>on the device</b> and the problem
+    disappears for everyone, everywhere, with no setting.
+  </p>
+
+  <table>
+    <thead><tr><th style="width:27%">Approach</th><th style="width:14%">Verdict</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Hardcode Asia/Kathmandu</td><td style="color:var(--danger);font-weight:700">No</td>
+        <td>Works for you, breaks for every other user, and silently &mdash; their days are just
+          wrong by a few hours and they never know why.</td></tr>
+      <tr><td>Ask the user to pick a timezone</td><td style="color:var(--danger);font-weight:700">No</td>
+        <td>A setting that can only ever be wrong. Nobody updates it when they travel.</td></tr>
+      <tr><td>Drop the feature</td><td style="color:var(--text-2);font-weight:700">Overkill</td>
+        <td>The fix is one line.</td></tr>
+      <tr><td><b>Group on the device</b></td><td style="color:var(--accent);font-weight:700">Yes</td>
+        <td>The server returns raw UTC timestamps; the phone buckets them. JavaScript's
+          <code>Date</code> is already in device-local time. Travel to London and the history
+          re-buckets correctly on landing. This is what WhatsApp and iMessage do.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="banner" style="margin-top:24px">
+    <b>The whole fix:</b>
+    <code>const localDay = new Date(log.created_at).toDateString();</code>
+    <br><br>
+    <b>But verify one response first.</b> This only works if the API returns the UTC marker
+    &mdash; <code>2026-10-16T18:30:00Z</code> or <code>+00:00</code>. Your column is
+    <code>DateTime(timezone=True)</code> so it should. If a naive timestamp
+    (<code>2026-10-16T18:30:00</code>, no Z) ever slips through, JavaScript reads it as
+    <i>local</i> time and every day silently shifts by 5:45 &mdash; and only for users outside
+    UTC. Brutal to debug after the fact.
+    <br><br>
+    <b>Week starts Monday</b>, as you said &mdash; that matches Nepal and Europe. Worth knowing
+    it is Sunday in the US, so if you ever want that right, read it from the device locale
+    rather than hardcoding. The strip above is labelled <b>&ldquo;Last 7 days&rdquo;</b> for a
+    different reason: on a Monday morning a Mon&ndash;Sun strip shows a single dot and looks
+    broken. Same component either way &mdash; your call.
+  </div>
+</section>
+
+<footer>
+  <b>Summary:</b> chips &mdash; clickable, free, build them. Mood strip &mdash; clickable,
+  genuinely valuable, but roughly two hours of work across both ends. If you only want the free
+  wins, do the chips and the contextual line and leave the mood strip for later.
+  <br><br>
+  Four sample files in <code>docs/</code>. No app code modified.
+</footer>
+</div>
+
+<script>
+// Week runs Monday .. today, which matches the owner's locale.
+// Each chat carries the session it came from - mood_logs.session_id already
+// stores exactly this, so none of it needs a new column.
+var DAYS = [
+  {d:"Mon", k:"f2", mood:"stressed", i:3, chats:[
+     {t:"Deadline panic", at:"9:12 am"}, {t:null, at:"6:40 pm"}]},
+  {d:"Tue", k:"f1", mood:"tired",    i:2, chats:[
+     {t:"Can't sleep", at:"1:05 am"}]},
+  {d:"Wed", k:"f1", mood:"neutral",  i:1, chats:[
+     {t:"Random", at:"4:22 pm"}]},
+  {d:"Thu", k:"f3", mood:"happy",    i:4, chats:[
+     {t:"Portfolio site", at:"2:10 pm"}, {t:"Momo disaster", at:"7:45 pm"},
+     {t:null, at:"11:20 pm"}]},
+  {d:"Fri", k:"f2", mood:"sad",      i:3, chats:[
+     {t:"About her", at:"5:34 pm"}, {t:"Still thinking", at:"10:58 pm"}]},
+  {d:"Sat", k:"f1", mood:"calm",     i:2, chats:[
+     {t:"Weekend plans", at:"11:30 am"}]},
+  {d:"Sun", k:"today", mood:null,    i:0, chats:[]}
+];
+
+var CHIPS = {
+  talk:{send:null, reply:"— empty chat, you start however you want.",
+        title:"Just talk",
+        why:"Opens a normal empty chat. Kept as the default so the chips never feel compulsory.",
+        code:"onOpenChat()", free:true},
+  vent:{send:"I need to vent about something", reply:"Go on. What happened?",
+        title:"Vent",
+        why:"The preset message tells detect_mood() immediately that this is a low conversation, so the warm register starts on message one instead of warming up over three.",
+        code:"onStartChatWithMessage(\"I need to vent about something\")", free:true},
+  over:{send:"I can't stop overthinking", reply:"What's the thought that keeps coming back?",
+        title:"Overthinking",
+        why:"Your most common message, going by the screenshots you sent me. Worth a one-tap shortcut.",
+        code:"onStartChatWithMessage(\"I can't stop overthinking\")", free:true},
+  good:{send:"I've got good news", reply:"Go on then, let's hear it.",
+        title:"Good news",
+        why:"Opens in the playful register. Right now nothing in the app invites a good mood — it is built entirely around bad days.",
+        code:"onStartChatWithMessage(\"I've got good news\")", free:true}
+};
+
+function el(id){return document.getElementById(id)}
+
+/* ---- build the strip ---- */
+(function(){
+  var m = el("mood");
+  DAYS.forEach(function(day, i){
+    var s = document.createElement("span");
+    s.className = "dot " + day.k;
+    s.textContent = day.k === "today" ? "+" : day.d[0];
+    s.onclick = function(){ tapDay(i, s) };
+    m.appendChild(s);
+  });
+})();
+
+function tapDay(i, node){
+  document.querySelectorAll(".dot").forEach(function(d){d.classList.remove("sel")});
+  node.classList.add("sel");
+  var day = DAYS[i];
+
+  var list = el("sh-list");
+  list.innerHTML = "";
+
+  if(day.k === "today"){
+    el("sh-title").textContent = "Today";
+    el("sh-when").textContent = "Nothing logged yet";
+    el("sh-body").textContent = "This dot fills itself the moment you send your first message — detect_mood() already runs on every one. Nothing to fill in by hand.";
+    el("sh-a1").textContent = "Start a chat";
+  } else {
+    el("sh-title").textContent = day.d + " — you sounded " + day.mood;
+    el("sh-when").textContent = "intensity " + day.i + "/5 · "
+      + day.chats.length + " conversation" + (day.chats.length === 1 ? "" : "s");
+
+    // Every chat that day, newest last. One chat -> skip the list and open it.
+    day.chats.forEach(function(c){
+      var row = document.createElement("div");
+      row.className = "chatrow";
+      row.innerHTML = '<span class="ch">&#8250;</span><b></b><span></span>';
+      var title = row.querySelector("b");
+      if(c.t){ title.textContent = c.t; }
+      else { title.innerHTML = "<i>Untitled</i>"; }
+      row.querySelectorAll("span")[1].textContent = c.at;
+      row.onclick = function(){ closeSheet(); };
+      list.appendChild(row);
+    });
+
+    el("sh-body").textContent =
+      "The mood was detected from what you wrote — you never filled it in. "
+      + "Each row opens that conversation.";
+    el("sh-a1").textContent = "Close";
+  }
+  openSheet();
+
+  explain(
+    day.k === "today" ? "Tapped today's +" : "Tapped " + day.d,
+    day.k === "today"
+      ? "Today has no mood yet, so the dot is a dashed outline. It fills on your first message of the day — you never log a mood by hand."
+      : "Lists every conversation from that day. This works because mood_logs.session_id already stores which chat produced each reading — the link exists, it has just never been read back.",
+    false,
+    "Needs list_recent_moods() + GET /moods/week — neither exists yet"
+  );
+}
+
+function openSheet(){el("veil").classList.add("on");el("sheet").classList.add("on")}
+function closeSheet(){el("veil").classList.remove("on");el("sheet").classList.remove("on")}
+
+/* ---- chips ---- */
+function startChip(key){
+  var c = CHIPS[key];
+  closeSheet();
+  el("v-home").classList.remove("on");
+  el("v-chat").classList.add("on");
+
+  var t = el("thread");
+  t.innerHTML = "";
+
+  if(!c.send){
+    t.innerHTML = '<p style="color:var(--text-2);text-align:center;font-size:13.5px;margin-top:28px">'
+      + 'Empty chat. Say whatever you want.</p>';
+  } else {
+    add(t, "me", c.send);
+    var typing = document.createElement("div");
+    typing.className = "row";
+    typing.innerHTML = '<div class="bub ai typing"><i></i><i></i><i></i></div>';
+    t.appendChild(typing);
+    setTimeout(function(){ typing.remove(); add(t, "ai", c.reply); }, 1100);
+  }
+
+  explain("Tapped “" + c.title + "”", c.why, true, c.code);
+}
+
+function add(t, who, text){
+  var r = document.createElement("div");
+  r.className = "row" + (who === "me" ? " me" : "");
+  r.innerHTML = '<div class="bub ' + who + '"></div>';
+  r.firstChild.textContent = text;
+  t.appendChild(r);
+  t.scrollTop = t.scrollHeight;
+}
+
+function goHome(){
+  closeSheet();
+  el("v-chat").classList.remove("on");
+  el("v-home").classList.add("on");
+  document.querySelectorAll(".dot").forEach(function(d){d.classList.remove("sel")});
+}
+
+function explain(title, body, free, code){
+  el("explain").innerHTML =
+    '<div class="ev"><b></b><p></p>'
+    + '<span class="cost ' + (free ? "free" : "work") + '">'
+    + (free ? "✓ Free — already wired up" : "⚠ Needs backend work") + '</span>'
+    + '<p style="margin-top:11px"><code></code></p></div>';
+  var ev = el("explain").querySelector(".ev");
+  ev.querySelector("b").textContent = title;
+  ev.querySelector("p").textContent = body;
+  ev.querySelector("code").textContent = code;
+}
+
+function toggleTheme(){var r=document.documentElement;
+  r.setAttribute("data-theme", r.getAttribute("data-theme")==="dark"?"light":"dark")}
+</script>
+</body>
+</html>

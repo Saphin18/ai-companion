@@ -20,6 +20,7 @@ import {
 } from 'expo-audio';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import { type } from '../theme/typography';
 import { useTheme } from '../context/ThemeContext';
 import { pickerLock } from '../services/pickerLock';
 import { uploadAttachment } from '../services/attachments';
@@ -74,6 +75,14 @@ interface Props {
 
 const MAX_RECORD_MS = 120000;
 
+/** Milliseconds as m:ss, for the recording timer. */
+function formatElapsed(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(total / 60);
+  const sec = total % 60;
+  return `${m}:${sec < 10 ? "0" : ""}${sec}`;
+}
+
 export default function ChatInput({
   onSend,
   disabled,
@@ -118,6 +127,20 @@ export default function ChatInput({
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
   const recording = recorderState?.isRecording ?? false;
+
+  // How long the current take has been running. MAX_RECORD_MS cuts a
+  // recording off at two minutes; before this the user got no warning at all,
+  // the clip just ended.
+  const [elapsedMs, setElapsedMs] = useState(0);
+  useEffect(() => {
+    if (!recording) {
+      setElapsedMs(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const id = setInterval(() => setElapsedMs(Date.now() - startedAt), 250);
+    return () => clearInterval(id);
+  }, [recording]);
   const startedAt = useRef<number>(0);
   const autoStop = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -405,27 +428,38 @@ export default function ChatInput({
       )}
 
       {recording ? (
+        // Bugs #111/#112. Cancel used to be an unlabelled trash glyph in
+        // theme.surfaceAlt sitting next to text shouting "tap to send", so
+        // nobody found it - the owner did not know it existed. A destructive
+        // action gets a WORD and a danger outline, never a bare icon. The pill
+        // no longer doubles as a send button either; one control, one job.
         <View style={styles.container}>
           <TouchableOpacity
-            style={[styles.iconBtn, { backgroundColor: theme.surfaceAlt }]}
+            style={[styles.cancelBtn, { borderColor: theme.danger }]}
             onPress={cancelRecording}
+            accessibilityRole="button"
             accessibilityLabel="Cancel voice message"
           >
-            <Ionicons name="trash-outline" size={20} color={theme.danger} />
+            <Ionicons name="close" size={15} color={theme.danger} />
+            <Text style={[styles.cancelText, { color: theme.danger }]}>Cancel</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.recording, { backgroundColor: theme.surfaceAlt }]}
-            onPress={stopRecording}
-            activeOpacity={0.8}
-          >
+
+          <View style={[styles.recBar, { backgroundColor: theme.surfaceAlt }]}>
             <View style={[styles.recDot, { backgroundColor: theme.danger }]} />
-            <Text style={[styles.recText, { color: theme.textPrimary }]}>
-              Recording... tap to send
+            <Text style={[styles.recTimer, { color: theme.textPrimary }]}>
+              {formatElapsed(elapsedMs)}
             </Text>
-          </TouchableOpacity>
+            <Text style={[styles.recLimit, { color: theme.textSecondary }]}>
+              {" / "}
+              {formatElapsed(MAX_RECORD_MS)}
+            </Text>
+          </View>
+
           <TouchableOpacity
             style={[styles.iconBtn, { backgroundColor: theme.accent }]}
             onPress={stopRecording}
+            accessibilityRole="button"
+            accessibilityLabel="Send voice message"
           >
             <Ionicons name="send" size={20} color={theme.accentText} />
           </TouchableOpacity>
@@ -525,12 +559,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  recording: {
+  cancelBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 24,
+    paddingHorizontal: 15,
+    minHeight: 44,
+  },
+  cancelText: { ...type.label },
+  recBar: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 24,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     minHeight: 48,
     marginHorizontal: 8,
   },
@@ -540,9 +584,8 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginRight: 10,
   },
-  recText: {
-    fontSize: 15,
-  },
+  recTimer: { ...type.bodyStrong },
+  recLimit: { ...type.caption },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
