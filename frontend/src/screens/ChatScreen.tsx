@@ -13,6 +13,7 @@ import {
 import * as Speech from "expo-speech";
 import ChatBubble from "../components/ChatBubble";
 import ChatInput from "../components/ChatInput";
+import TypingBubble from "../components/TypingBubble";
 import { ChatError, loadSessionMessages } from "../services/api";
 import { sendChatWithAttachments } from "../services/attachments";
 import { Attachment, ChatMessage } from "../types/chat";
@@ -229,13 +230,11 @@ export default function ChatScreen({ sessionId, onBack, initialMessage, initialA
         keyboardShouldPersistTaps="handled"
         onContentSizeChange={scrollToEnd}
         onLayout={scrollToEnd}
+        // Shown as the list FOOTER rather than above the input, so the
+        // dots sit exactly where the reply will appear and the thread
+        // scrolls to them.
+        ListFooterComponent={sending ? <TypingBubble /> : null}
       />
-
-      {sending && (
-        <Text style={[styles.thinking, { color: theme.textSecondary }]}>
-          Thinking{"\u2026"}
-        </Text>
-      )}
 
       <ChatInput
         onSend={handleSend}
@@ -286,9 +285,4 @@ const styles = StyleSheet.create({
   backText: { fontSize: 17 },
   headerTitle: { fontSize: 20, fontWeight: "700" },
   list: { paddingHorizontal: 16, paddingBottom: 10 },
-  thinking: {
-    paddingHorizontal: 20,
-    paddingBottom: 6,
-    fontStyle: "italic",
-  },
 });
