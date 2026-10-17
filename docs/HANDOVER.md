@@ -4529,6 +4529,35 @@ had already finished and the cancel returned `GraphQL request failed`.
 - Unchanged from 24.16: typography rollout, stale Expo Go push token row, FCM
   key on the `production` profile, and the 23.14 carry-overs.
 
+## 24B.8 Bugs this session - AUTHORITATIVE TABLE (continues 23.12)
+
+Session 23 ended at **#104**. Numbers below were used in code comments as the
+work happened and are scattered across 24.2-24.10, 24.13 and 24B.1-24B.3; this
+is the single list. **The next bug number is #115.**
+
+| # | Description | Cause | Status |
+|---|---|---|---|
+| 105 | **A quote on EVERY reply**, not one in three | the prompt asked for "roughly one message in three" - a model cannot honour a frequency rule, each turn is an independent completion with no memory of how often it has done something | FIXED - gated in `chat.py` |
+| 106 | **Invented quotes** presented as real ("Absence sharpens love, presence strengthens it") | told to use only quotes it was "confident are real"; it is confident about things it made up, and there is no way to verify a quote at runtime | FIXED - `QUOTE_BANK`, 13 sourced lines, handed to the model instead of recalled |
+| 107 | Gate stayed open for four replies running | asked to weave quotes into sentences, the model dropped the quote marks; `has_quote()` matched `"..."` only | FIXED - matches the bank lines' WORDS, normalised |
+| 108 | Direct questions answered with a quote or a question, twice in a row | "no advice unless asked" over-fired and blocked advice even when asked | FIXED - explicit rule, answer in a sentence or two |
+| 109 | **"I'm fine" taken at face value** right after something heavy | nothing compared the message against the mood reading | FIXED - `_is_deflection()` spots the mismatch server-side |
+| 110 | **Same comfort line in reply after reply** ("I'm here if you want to talk") | first "fixed" by BANNING the warm phrases, which swung the register to "damn, that sucks" for grief. Banning words is the wrong tool for a repetition problem | FIXED - `COMFORT_PHRASES` tracked per conversation; `strip_repeated_comfort()` removes a repeat |
+| 111 | **Voice Cancel undiscoverable** - the owner did not know it existed | thin unlabelled trash glyph in `surfaceAlt`, beside text shouting "tap to send"; the pill also duplicated send | FIXED - labelled button, danger outline, one control per job |
+| 112 | Recordings cut off at 2:00 with no warning | `MAX_RECORD_MS` auto-stopped silently; no timer, no waveform, no sign the mic was live | FIXED - live `0:12 / 2:00` timer |
+| 113 | **A rate limit reported as "couldn't reach the server"** | `generate_reply` was unguarded so any provider failure became a bare 500, and `ChatScreen` answered every failure with one hardcoded line | FIXED TWICE - the first fix went into `sendChatMessage`, which is DEAD CODE (see 24B.1) |
+| 114 | Static italic **"Thinking..."** below the thread | promised as animated dots in the mockup and never built; static text reads as a frozen app during a 2s call | FIXED - `TypingBubble`, rendered as the list footer |
+| 98 | Every new user forced to the LIGHT theme | `app.json` `userInterfaceStyle: "light"` overrode the "system" default | FIXED - `"automatic"` |
+| 101 | Deleted accounts kept receiving check-in pushes forever | `delete_account` removed only the auth user; `run-checkins` iterates profiles | FIXED |
+| 102 | Stale push tokens accumulated forever | `send_push` returned `r.status_code == 200`; Expo reports delivery failures in the BODY | FIXED - tokens pruned on `DeviceNotRegistered` |
+| 103 | Attachment files never deleted from the bucket | `storage.remove()` is called by nothing, with a docstring claiming otherwise | **DOC FIXED ONLY** - wiring it up is a retention decision |
+| 104 | Stray Vercel `dist` project serving a stale public copy | `--yes` on a deploy command creates a project rather than confirming a deploy | **CLOSED** - deleted, returns 404 |
+| - | CORS `allow_origins=["*"]` with `allow_credentials=True` | browsers reject a wildcard origin on a credentialed request, so the header was silently ignored | FIXED - credentials off; auth is Bearer, never cookie |
+
+**Not a bug, but it stopped the app today:** Groq's free tier is **200,000
+tokens per DAY** and live-testing the prompt exhausted it, so chat returned 429
+for the rest of the session. See 24.14.
+
 ## 24B.7 Rules
 
 1. **Grep for the caller before fixing a behaviour.** A deployed fix to dead
