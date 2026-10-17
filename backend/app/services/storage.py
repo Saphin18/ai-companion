@@ -62,7 +62,19 @@ async def signed_url(path: str, expires_in: int = SIGNED_URL_TTL) -> str | None:
 
 
 async def remove(path: str) -> bool:
-    """Delete a stored file. Only used when account deletion runs."""
+    """Delete a stored file from the bucket.
+
+    WARNING (bug #103): nothing calls this. The docstring used to claim it ran
+    on account deletion; it never has, so every image, document and voice note
+    ever uploaded is still sitting in the bucket, including for deleted
+    accounts.
+
+    It was left uncalled on purpose rather than wired up blind: deleting the
+    files while rule 0.4 keeps the chat rows would leave broken attachment
+    bubbles pointing at missing objects. Removing someone's files is a
+    retention decision, not a bug fix - so it needs an owner's call on whether
+    account deletion should also drop the rows that reference them.
+    """
     if not settings.supabase_service_role_key:
         return False
     try:

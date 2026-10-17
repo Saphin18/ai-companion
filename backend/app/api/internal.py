@@ -7,7 +7,7 @@ from app.repositories import checkin_repository as checkins
 from app.repositories import goal_repository as goals
 from app.repositories import push_repository as pushes
 from app.ai.checkin_writer import generate_checkin
-from app.services.expo_push import send_push
+from app.services.expo_push import UNREGISTERED, send_push
 
 router = APIRouter()
 
@@ -23,6 +23,7 @@ async def run_checkins(
     now = datetime.now(timezone.utc)
     now_min = now.hour * 60 + now.minute
     sent = 0
+    pruned = 0   # dead tokens dropped this run (bug #102)
 
     for p in await checkins.get_checkin_enabled_profiles(db):
         try:
@@ -40,10 +41,16 @@ async def run_checkins(
             titles = await goals.active_goal_titles(db, uid)
             line = await generate_checkin(titles)
             for tok in await pushes.get_tokens(db, uid):
-                await send_push(tok, "Saphin AI", line, {"type": "checkin"})
+                result = await send_push(tok, "Saphin AI", line, {"type": "checkin"})
+                # Expo answers 200 even when a token is dead, reporting the
+                # real outcome in the body. Act on it instead of letting dead
+                # tokens accumulate forever (bug #102).
+                if result == UNREGISTERED:
+                    await pushes.delete_token(db, tok)
+                    pruned += 1
             await checkins.set_last_checkin_date(db, p.id, local_today)
             sent += 1
         except Exception:
             continue
 
-    return {"sent": sent}
+    return {"sent": sent, "pruned": pruned}

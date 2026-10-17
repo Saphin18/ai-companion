@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.profile import ProfileOut, ProfileUpdate
 from app.repositories import profile_repository as repo
+from app.repositories import push_repository as push_repo
 
 router = APIRouter()
 
@@ -42,13 +43,38 @@ async def update_profile(
 @router.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_account(
     user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
 ) -> None:
     """
     Permanently delete the caller's Supabase auth account.
     This frees the email for reuse (a re-signup starts fresh). Chat data in
     our own tables is keyed by a plain user_id column with no FK to auth.users,
-    so it is intentionally left in the database and NOT deleted.
+    so it is intentionally left in the database and NOT deleted (rule 0.4).
+
+    Bug #101: "keep their data" was read as "change nothing", so a deleted
+    account kept `checkin_enabled = true` and kept its push tokens, and the
+    daily `run-checkins` cron iterates profiles - not auth users. People who
+    deleted their account carried on getting a notification every morning,
+    forever, with no way to stop it.
+
+    Notifications are not chat data. The two are silenced here BEFORE the auth
+    user is deleted, so that if the Supabase call then fails we have not left
+    someone half-deleted and still being pushed to.
     """
+    # Silence notifications first - see the note above about ordering.
+    # update_profile_fields CREATES a row when none exists, which would leave
+    # a brand new profile behind for an account being deleted, so check first.
+    try:
+        if await repo.get_profile(db, user_id) is not None:
+            await repo.update_profile_fields(db, user_id, {"checkin_enabled": False})
+            await db.commit()
+    except Exception:
+        await db.rollback()
+    try:
+        await push_repo.delete_tokens_for_user(db, user_id)
+    except Exception:
+        await db.rollback()
+
     if not settings.supabase_service_role_key:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
