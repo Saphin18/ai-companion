@@ -189,9 +189,6 @@ export default function LandingScreen({ onGetStarted, onLogin }: Props) {
               <Text style={styles.secondaryBtnText}>I already have an account</Text>
             </TouchableOpacity>
           </View>
-
-          {/* Answers the three questions everyone has before tapping. */}
-          <Text style={styles.fineprint}>Free. No card. 30 seconds.</Text>
         </Animated.View>
       </ScrollView>
     </LinearGradient>
@@ -253,11 +250,5 @@ const styles = StyleSheet.create({
     ...type.button,
     fontFamily: fonts.medium,
     color: "#cbb8a8",
-  },
-  fineprint: {
-    ...type.caption,
-    color: "#a89585",
-    textAlign: "center",
-    marginTop: 16,
   },
 });
