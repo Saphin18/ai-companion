@@ -4010,3 +4010,373 @@ re-confirming 18.9 and 19.6:
 9. **When the owner says they do not understand, stop explaining and start
    verifying.** The useful response to "just make sure it's correct" is
    evidence - git history, probe output, a passing check - not more prose.
+
+---
+
+# SECTION 24 - Session 24: friend-register rebuild, mood history, UI, deployed (Oct 17, 2026)
+
+> **This is the NEWEST section. Read it first. It OVERRIDES earlier sections
+> where they conflict.**
+>
+> Also read the **SETTLED - DO NOT RE-RAISE THESE** table at the very top of
+> this file before you put anything on an outstanding list.
+
+## 24.1 What happened
+
+The owner sent two screenshots of real conversations. Every single companion
+reply ended in a quote, several of the quotes were invented, and a direct
+question ("how can I make my heart calm?") was answered with a quote instead of
+an answer, twice. His words: *"is this what friends looks like where is the
+normal conversation?"*
+
+That was Session 23's work failing in production. Fixing it properly took three
+rounds of being wrong, which is the most useful part of this section.
+
+Then: four Session 23 bugs closed, the mood table given a read path, the
+landing and home screens rebuilt, and everything deployed to all three targets.
+
+## 24.2 THE BIG LESSON - a model cannot obey a frequency rule
+
+Session 23's prompt said a quote should appear *"roughly one message in three,
+never every time"*. It appeared in **every single reply**.
+
+This is not the model being disobedient. **Each turn is an independent
+completion with no memory of how often it has done something.** "One in three"
+is not a property any single response can have. The model sees "a quote may fit
+here", and a quote always fits.
+
+**If a rule is about FREQUENCY, ACCUMULATION or VARIETY across turns, it cannot
+live in the prompt. It has to be computed in code and enforced per request.**
+
+This is the same class as #93 ("not overly long" did nothing for two sessions)
+and #94 (markdown), and it will keep recurring. The pattern that works is
+always the same: **decide in code, instruct in the prompt, and clean up after
+the model anyway.**
+
+## 24.3 The quote gate (bug #105) - `api/chat.py`
+
+Three conditions, ALL required, all evaluated server-side:
+
+| # | Condition | Why |
+|---|---|---|
+| 1 | mood is low AND intensity >= `QUOTE_MIN_INTENSITY` (4) | not for someone mildly off |
+| 2 | >= `QUOTE_MIN_REPLIES` (2) prior assistant messages | a line on message one is a greetings card, not empathy |
+| 3 | no quote anywhere in `history` already | `history` is the last 20 messages, so this is ~one quote per ten exchanges |
+
+Measured: **1 quote across 7 sad replies**, arriving mid-conversation. Before:
+7 of 7.
+
+## 24.4 The quote bank (bug #106) - `ai/groq_provider.py`
+
+Told *"only use a quote you are confident is real"*, the model produced
+**"Absence sharpens love, presence strengthens it"** and **"It's okay to sit
+with the storm for a while"**. Neither is a quote by anyone. They just sound
+like one.
+
+**The model is confident about things it invented. That instruction can never
+work.** There is no way to verify a quote at runtime, so it is no longer asked
+to recall one: when the gate opens it is handed `QUOTE_BANK` - 13 lines with
+real, checkable sources (Frost, Rilke, Camus, Hugo, Queen Elizabeth II,
+Chaplin, Kabat-Zinn, Dinesen, Coelho, Tutu, Keller, plus two proverbs with no
+author).
+
+**Adding to that list: only add a line you can point to an actual source for.**
+A line that merely sounds wise is the exact bug the list exists to kill.
+
+## 24.5 Detect the WORDS, not the punctuation (bug #107)
+
+Told to weave quotes into a sentence rather than stamp them on the end, the
+model **dropped the quotation marks entirely**:
+
+> That uncertainty hits hard-this too shall pass, even if it feels endless.
+
+`has_quote()` matched `"..."` only, saw nothing, left the gate open, and it
+quoted four replies in a row. `has_quote()` now also matches the bank lines
+themselves, normalised (lowercase, punctuation stripped, contractions
+expanded).
+
+**Any guard that matches formatting will be defeated the moment you ask the
+model to change its formatting.**
+
+## 24.6 Over-correction, twice - the owner was right both times
+
+**Round 1.** Quotes were made rare. Result: a deeply sad 6-turn conversation
+produced **zero**. Owner: *"i don't want in every 5 reply also"* - he wanted
+them rare, not gone.
+
+**Round 2.** The therapist vocabulary was BANNED outright ("I hear you", "I'm
+here if you want to talk", "that sounds really hard"). The register swung to
+*"Damn. That actually sucks."* for everything - including grief. Owner:
+*"sometimes we want to talk emotionally... that isn't suitable... this sound
+good already: 'That sounds really hard. I'm here if you want to talk.'"*
+
+**He was right. The warm phrases were never the bug.** Saying the SAME one in
+reply after reply was. Banning words is the wrong tool for a repetition
+problem.
+
+The fix is now two registers plus `COMFORT_PHRASES` tracking (24.7):
+
+- **heavy** (real pain, grief, worn down) - gentle, warm, unhurried. Casual
+  slang is explicitly wrong here.
+- **light** (banter, small stuff, good news) - "Brooo what happened?"
+
+## 24.7 Comfort-phrase repetition (bug #110)
+
+`COMFORT_PHRASES` in `groq_provider.py` is **not a ban list**. The phrases are
+good - once. `chat.py` collects which have already been spent in this
+conversation and tells the model to use different words.
+
+Prompting alone did not hold (it reused "I'm here for you" in live testing
+anyway), so `strip_repeated_comfort()` removes a repeated line when it lands as
+a tacked-on final sentence - which is where they almost always land. It only
+strips if >= 25 chars survive: a repeated line beats an empty bubble.
+
+**Signatures are SHORT on purpose** ("i am here", not the whole sentence). The
+model rewords freely - "If you want to talk about her or anything else, I'm
+here" - and whole-sentence matching missed every repeat. Contractions are
+expanded in `_normalise()` so "I'm here" and "I am here" are the same string.
+
+## 24.8 Other register fixes
+
+- **Direct questions get answered.** "No advice unless asked" was blocking
+  advice even when asked. Answering also does not mean writing an article:
+  ONE thing to try, in a sentence or two.
+- **"I'm fine" detection (#109).** `_is_deflection()` in `chat.py` spots a
+  short brush-off ("nah I'm fine", "nothing", "nvm") while the mood detector
+  still reads low. The mismatch is between two things the server already knows,
+  so it is decided in code, not hoped for. Produces: *"You say you're fine but
+  you sound wiped, what's going on?"* Requires an existing conversation - an
+  opening "nothing" is just an opening.
+
+## 24.9 Backend bugs closed
+
+| # | Fix |
+|---|---|
+| 101 | `delete_account` now sets `checkin_enabled=False` and deletes push tokens **before** the Supabase auth call, so a failure there cannot leave someone half-deleted and still pushed to. Rule 0.4 keeps chat data; notifications are not chat data. |
+| 102 | `send_push` returns `SENT`/`UNREGISTERED`/`FAILED` by reading Expo's ticket body. It used to return `r.status_code == 200` - Expo accepts the REQUEST with 200 and reports delivery failures inside the body, which nothing read. `run-checkins` now prunes dead tokens. |
+| 103 | `storage.remove()` docstring now admits nothing calls it. **Still not wired up, deliberately:** deleting the files while rule 0.4 keeps the rows leaves attachment bubbles pointing at missing objects. Needs an owner decision on retention. |
+| 98 | `app.json` `userInterfaceStyle` `"light"` -> `"automatic"`. |
+| - | CORS: `allow_credentials` `True` -> `False`. Browsers reject a wildcard origin on a credentialed request, so `allow_origins=["*"]` was silently ignored. Auth is Bearer, never cookie. |
+
+## 24.10 Mood history - NEW `GET /moods/recent`
+
+`detect_mood()` has logged a reading for **every message since Phase 3A** and
+`mood_repository` had exactly one function, `add_mood_log`. The table was
+write-only. Nothing in the frontend mentioned mood at all.
+
+- `list_recent(db, user_id, days=7)` joins `ChatSession.title` so the client
+  can list the conversations behind a day in one round trip. `session_id` was
+  always stored and never followed.
+- It fetches `days + 1` on purpose - see the timezone rule below.
+
+### TIMEZONE - grouping happens ON THE DEVICE, never on the server
+
+The server returns raw UTC and does **no** bucketing. `MoodWeek.tsx` groups
+with `new Date(iso)`, which is automatically in the device's timezone.
+
+**Why this matters here specifically:** Nepal is **UTC+5:45**. Grouping by UTC
+date puts every message sent between local midnight and 05:45 on the *previous*
+day - which is exactly the window a companion app gets its most honest messages
+in. It would look like "the app is just wrong", not like a timezone bug.
+
+Device-side grouping needs no setting, no stored preference, and follows the
+user if they travel. **Never add a timezone picker** - it is a setting that can
+only ever be wrong.
+
+**Verify once if timestamps ever look shifted:** the API must return the UTC
+marker (`...Z` or `+00:00`). A naive timestamp is parsed by JavaScript as
+*local*, shifting every day silently and only for users outside UTC.
+
+**"Last 7 days", not "This week"**, because a Mon-Sun strip shows a single dot
+on a Monday morning and looks broken. (The owner's week does start Monday.)
+
+A day's headline mood is its **strongest** reading, not its last - one hard
+moment matters more than whatever was said at bedtime.
+
+## 24.11 Frontend
+
+| File | Change |
+|---|---|
+| `screens/LandingScreen.tsx` | **Rebuilt.** Real exchanges cycle in large type with the reply beneath; breathing orb; desktop column capped (it ran ~60% empty). No chat UI is drawn - a fake chat screenshot reads as dated and proves nothing. |
+| `screens/ChatsListScreen.tsx` | Home is top-anchored and left-aligned. Time-aware greeting, rotating question, mood strip, starter chips. Drawer grouped into **Yours** / **Settings**. |
+| `components/MoodWeek.tsx` | **NEW.** The strip + day sheet. Returns `null` on failure - a mood history is a nice-to-have and must never break home. |
+| `components/ChatInput.tsx` | Voice: labelled **x Cancel** with danger outline, live `0:12 / 2:00` timer, pill no longer doubles as send. |
+| `services/api.ts` | `listRecentMoods()`, `MoodLog`. |
+| `app.json` | `userInterfaceStyle: "automatic"`. |
+
+**The starter chips are free** - `onStartChatWithMessage` already existed and
+was already wired in `App.tsx`. They send a real first message, which also
+tells `detect_mood()` what kind of conversation this is so the register starts
+right instead of warming up over three exchanges.
+
+**The question rotates on purpose.** The same line every evening becomes
+wallpaper within a week - the exact failure just fixed in the chat replies.
+
+## 24.12 Deployed - all three targets
+
+| Target | How | Verified |
+|---|---|---|
+| Backend | `git push` -> Render auto-deploy | `/health` ok; `/moods/recent` returns 401 not 404 |
+| Web | `expo export --platform web` -> `vercel deploy --prod` | HTTP 200, all 4 fonts serving |
+| APK | `eas build -p android --profile preview` | finished |
+
+Commits: `53dd9f7`, `6602f9e`, `3ac3804`, `2740192`.
+
+### DEPLOYMENT MARKER
+
+`POST /internal/run-checkins` now returns `{"sent": N, "pruned": M}`. The old
+build returned `{"sent": N}` only. **Hitting that endpoint tells you which build
+is live on Render without reading any logs.**
+
+### `expo export` WIPES `dist/`, INCLUDING `dist/.vercel/`
+
+This is how Session 23 created the stray `dist` project. Every web deploy must
+re-link first:
+
+```powershell
+cd frontend
+npx expo export --platform web
+cd dist
+npx vercel link --yes --project saphinai
+cat .vercel/project.json      # MUST say "projectName":"saphinai"
+npx vercel deploy --prod
+```
+
+**Never `vercel dist --prod --yes`.** `--yes` means "create a project without
+asking", not "yes, deploy".
+
+Bug #104 is now **closed** - the stray `dist` project was deleted by the owner
+and `dist-six-chi-27.vercel.app` returns 404.
+
+## 24.13 Bug #113 - a rate limit is not a network outage
+
+Minutes after deploying, the owner sent a screenshot: mid-conversation the
+companion replied **"Sorry, I couldn't reach the server. Please try again."**
+
+The server had been reached perfectly. Groq's free tier had run out of tokens
+for the day and said so clearly, with a 429.
+
+**Two faults, both about honesty:**
+
+1. `generate_reply` in `api/chat.py` had **no error handling at all**, so any
+   provider failure became a bare 500.
+2. `ChatScreen` answered *every* failure with the same hardcoded line.
+
+So a quota wall was reported as a network outage. That sends someone to check
+their wifi for a problem that has nothing to do with wifi, and tells them to
+"try again" when retrying cannot possibly work.
+
+Now: the backend catches provider failures, **rolls back the user's message**
+rather than stranding it in history with no reply, and returns 503 with a short
+honest line - rate limits say the limit resets in a few hours, everything else
+says try again shortly. No vendor names, no stack traces. The frontend throws
+`ChatError` carrying the server's `detail` and shows it, falling back to the old
+text only when there genuinely was no response.
+
+**RULE: a user-facing error must describe what actually happened.** A generic
+catch-all message is worse than useless when it is confidently wrong - it sends
+people to debug the wrong thing.
+
+## 24.14 Groq free tier - 200,000 tokens/DAY
+
+Live-testing the prompt exhausted the daily quota and chat returned 429 for the
+rest of the session.
+
+```
+RateLimitError: 429 - tokens per day (TPD): Limit 200000
+```
+
+**Budget for this.** A full conversation replay is ~15 calls at ~1-3k tokens
+each. Test the deterministic helpers (`has_quote`, `strip_trailing_quote`,
+`strip_repeated_comfort`, `_is_deflection`) with unit tests - they need no model
+at all - and save live replays for confirming register changes.
+
+## 24.15 Documentation rot cost the owner time TWICE
+
+Sections 12, 15, 18, 20-23 all carried **"RED: rotate the exposed Supabase DB
+password and CRON_SECRET"**. The owner had already done both, **sessions ago**.
+Nobody ever closed it, because the file is append-only and each session copied
+the previous outstanding list forward without checking.
+
+This session repeated the mistake: the item was relayed as fact and the owner
+was walked through steps for work already finished. He had to say so twice.
+
+**Both were then verified in under a minute:**
+
+```
+/health                         -> {"status":"ok"}    DB password works
+run-checkins, wrong secret      -> 403                guard works, no side effects
+run-checkins, real secret       -> 200 {"sent":0}     local .env matches Render
+git log -- backend/.env         -> empty              never committed
+git grep <live password>        -> no hits            not in any tracked file
+```
+
+**RULE: before relaying any security or config item from this document as
+outstanding, probe it.** A RED flag in an old section is a record of what was
+true then, not a fact about now. The **SETTLED** table at the top of this file
+exists for exactly this and must be checked first.
+
+## 24.16 Still outstanding
+
+- **RED: the app has no consistent name.** `app.json`, the intro, the sidebar,
+  lock, profile, reminders, push notifications and **every backend email** say
+  **"Saphin AI"** (16 places). `LandingScreen` and `AuthScreen` - the two
+  screens a new user sees FIRST - say **"Your Companion"**. The home input says
+  "Chat with Saphin...", the chat header says "Companion". **The owner is
+  deciding the real name and deferred it to a later session.** Whatever he
+  picks, it has to be applied to all ~20 places including the emails.
+- **ORANGE: `expo-updates` is NOT installed** and there is no `updates` block in
+  `app.json`. Every JS-only change therefore costs a 40-90 minute rebuild - this
+  session spent one entire build removing a single line of text. Installing it
+  needs one rebuild to take effect, after which JS changes ship in ~30s. This is
+  now the highest-leverage workflow change, ahead of the dev build.
+- **ORANGE: build a dev build** (`eas build --profile development`). Carried
+  from Session 23. Still nothing has been testable without a full build.
+- **ORANGE: nothing visual has been confirmed on a real device.** Two APKs were
+  produced this session and neither has been through 23.16's checklist. Add:
+  mood strip taps through to a day's chats, voice Cancel is findable, starter
+  chips open the right register, dark theme now follows the phone (#98).
+- **YELLOW: signup friction.** Email confirmation is ON (`AuthScreen` shows
+  "Check your email"). A landing line promising "30 seconds" was removed this
+  session because it was false. If signups are ever low, this is the first place
+  to look.
+- **YELLOW: #103** attachment files are still orphaned in the bucket.
+- ~~cron-job.org's `CRON_SECRET`~~ **CONFIRMED MATCHING.** Render's own logs
+  show `116.203.134.67 - "POST /internal/run-checkins HTTP/1.1" 200 OK` - a
+  Hetzner address, i.e. cron-job.org, getting 200 rather than 403. All three
+  copies of the secret agree. **Reading the deploy logs answered in seconds
+  what could not be checked any other way.**
+- **YELLOW:** typography rollout (screens still on the system font), stale Expo
+  Go push token row, FCM key on the `production` EAS profile.
+- Carried from 23.14 and untouched: `goals.py update_goal` / `reminders.py
+  delete_reminder` never 404; `AttachmentOut.extracted_text` ships full document
+  text on every history load; `sendChatWithAttachments` does not retry on 401;
+  attachment files are written before the DB row; `MemoryOut` uses Pydantic v1
+  `class Config`; home `(+)` on web uses `window.confirm`.
+
+## 24.17 Rules from this session
+
+1. **A model cannot honour a rule about frequency, accumulation or variety
+   across turns.** Each completion is independent. Decide it in code.
+2. **A model is confident about things it invented.** "Only use one you are
+   sure is real" is unenforceable. Supply the list instead.
+3. **Any guard that matches formatting breaks when you change the formatting
+   instructions.** Match the words.
+4. **Banning words is the wrong tool for a repetition problem.** The warm
+   phrases were never the bug; saying the same one every time was.
+5. **Group dates on the device, never the server.** The server cannot know what
+   day it is for the caller.
+6. **A destructive action gets a word, not a glyph.** The voice cancel button
+   existed for sessions and the owner never found it - which is worse than
+   missing, because people send recordings they meant to discard.
+7. **Probe before relaying a documented TODO.** An old RED flag is history, not
+   a fact. This cost the owner time twice in one session.
+8. **`--yes` on a deploy command confirms something.** Read what.
+9. **When the owner says a change reads wrong, he is describing the product
+   better than the spec is.** Both over-corrections this session were caught by
+   him, not by tests.
+10. **A user-facing error must say what actually happened.** "Couldn't reach
+    the server" for a quota wall is confidently wrong, and confidently wrong is
+    worse than vague.
+11. **Read the deploy logs.** cron-job.org's secret had been listed as
+    unverifiable; one line of Render's own log settled it.
