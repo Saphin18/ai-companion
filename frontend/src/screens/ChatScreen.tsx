@@ -176,7 +176,9 @@ export default function ChatScreen({ sessionId, onBack, initialMessage, initialA
       // free-tier daily quota ran out the server answered perfectly and said
       // so - the app just talked over it, sending the user to check their
       // wifi. Use the backend's own message when it sent one.
-      const text =
+      // Named errorText, not text: `text` is this function's own parameter and
+      // shadowing it here reads as a bug even though block scope makes it safe.
+      const errorText =
         e instanceof ChatError && e.message
           ? e.message
           : "Sorry, I couldn't reach the server. Please try again.";
@@ -185,7 +187,7 @@ export default function ChatScreen({ sessionId, onBack, initialMessage, initialA
         {
           id: `err-${Date.now()}`,
           role: "companion",
-          text,
+          text: errorText,
           createdAt: Date.now(),
         },
       ]);

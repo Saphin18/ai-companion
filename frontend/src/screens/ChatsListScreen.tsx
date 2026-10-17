@@ -64,7 +64,11 @@ function pickQuestion(): string {
   // ordinary evening.
   const h = now.getHours();
   if (h >= 0 && h < 5) return "Still up?";
-  const dayNumber = Math.floor(now.getTime() / 86400000);
+  // Day number in the DEVICE's timezone, not UTC - same rule as MoodWeek.
+  // getTime() alone would roll the question over at 05:45 local in Nepal
+  // (UTC+5:45) rather than at midnight.
+  const localMs = now.getTime() - now.getTimezoneOffset() * 60000;
+  const dayNumber = Math.floor(localMs / 86400000);
   return QUESTIONS[dayNumber % QUESTIONS.length];
 }
 
