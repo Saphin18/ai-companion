@@ -22,6 +22,14 @@ export class ChatError extends Error {}
 
 export type ChatReply = { reply: string; session_id: string };
 
+/**
+ * DEAD CODE - nothing calls this. The chat screen uses
+ * `sendChatWithAttachments` in services/attachments.ts instead.
+ *
+ * Kept because it is the simpler reference implementation, but any change
+ * to chat request behaviour MUST be made in attachments.ts or it will have
+ * no effect at runtime (this caught out bug #113 once already).
+ */
 export async function sendChatMessage(
   message: string,
   sessionId: string | null

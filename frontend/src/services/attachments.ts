@@ -5,6 +5,7 @@
  */
 import { Platform } from "react-native";
 import { supabase } from "./supabase";
+import { ChatError } from "./api";
 import type { Attachment, AttachmentKind } from "../types/chat";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL as string;
@@ -84,7 +85,14 @@ export async function refreshAttachmentUrl(id: string): Promise<string | null> {
 
 export type ChatReply = { reply: string; session_id: string };
 
-/** Same as sendChatMessage, but carries attachment ids along with the text. */
+/**
+ * THE function the chat screen actually calls.
+ *
+ * Note for anyone fixing chat behaviour: `sendChatMessage` in api.ts is
+ * DEAD CODE - nothing imports it. A fix applied there changes nothing at
+ * runtime, which is exactly what happened the first time bug #113 was
+ * "fixed". Change this one.
+ */
 export async function sendChatWithAttachments(
   message: string,
   sessionId: string | null,
@@ -103,7 +111,19 @@ export async function sendChatWithAttachments(
       attachment_ids: attachmentIds,
     }),
   });
-  if (!res.ok) throw new Error(`Chat failed: ${res.status}`);
+  if (!res.ok) {
+    // The backend sends a human-readable `detail` for provider failures
+    // - a rate limit in particular. Surface it rather than letting
+    // ChatScreen fall back to "couldn't reach the server", which is
+    // flatly wrong when the server answered (bug #113).
+    let detail = "";
+    try {
+      detail = (await res.json())?.detail ?? "";
+    } catch {
+      detail = "";
+    }
+    throw new ChatError(detail || `Chat failed: ${res.status}`);
+  }
   return res.json();
 }
 
