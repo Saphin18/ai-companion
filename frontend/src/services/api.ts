@@ -17,6 +17,9 @@ async function authHeaders(): Promise<Record<string, string>> {
   };
 }
 
+/** A chat failure carrying a message that is safe to show the user. */
+export class ChatError extends Error {}
+
 export type ChatReply = { reply: string; session_id: string };
 
 export async function sendChatMessage(
@@ -28,7 +31,19 @@ export async function sendChatMessage(
     headers: await authHeaders(),
     body: JSON.stringify({ message, session_id: sessionId }),
   });
-  if (!res.ok) throw new Error(`Chat failed: ${res.status}`);
+  if (!res.ok) {
+    // The backend sends a human-readable `detail` for provider failures
+    // (rate limits in particular). Prefer it over a generic guess -
+    // telling someone the server is unreachable when it answered fine
+    // sends them to check their wifi for no reason (bug #113).
+    let detail = "";
+    try {
+      detail = (await res.json())?.detail ?? "";
+    } catch {
+      detail = "";
+    }
+    throw new ChatError(detail || `Chat failed: ${res.status}`);
+  }
   return res.json();
 }
 

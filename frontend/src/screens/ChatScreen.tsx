@@ -13,7 +13,7 @@ import {
 import * as Speech from "expo-speech";
 import ChatBubble from "../components/ChatBubble";
 import ChatInput from "../components/ChatInput";
-import { loadSessionMessages } from "../services/api";
+import { ChatError, loadSessionMessages } from "../services/api";
 import { sendChatWithAttachments } from "../services/attachments";
 import { Attachment, ChatMessage } from "../types/chat";
 import { useTheme } from "../context/ThemeContext";
@@ -171,12 +171,20 @@ export default function ChatScreen({ sessionId, onBack, initialMessage, initialA
         });
       }
     } catch (e) {
+      // Bug #113: this always claimed the server was unreachable. When Groq's
+      // free-tier daily quota ran out the server answered perfectly and said
+      // so - the app just talked over it, sending the user to check their
+      // wifi. Use the backend's own message when it sent one.
+      const text =
+        e instanceof ChatError && e.message
+          ? e.message
+          : "Sorry, I couldn't reach the server. Please try again.";
       setMessages((prev) => [
         ...prev,
         {
           id: `err-${Date.now()}`,
           role: "companion",
-          text: "Sorry, I couldn't reach the server. Please try again.",
+          text,
           createdAt: Date.now(),
         },
       ]);

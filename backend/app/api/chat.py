@@ -67,6 +67,24 @@ DEFLECTIONS = {
 DEFLECTION_MAX_WORDS = 5
 
 # Personality-mode instruction blocks (Phase 3B). "balanced" adds nothing.
+def _provider_error_message(exc: Exception) -> str:
+    """A short, honest, in-character line for a failed AI call.
+
+    Shown directly to the user, so it says what actually happened without
+    naming vendors or dumping a stack trace. Rate limits are separated out
+    because retrying is useless - the free tier resets on a daily window,
+    and telling someone to "try again" when it cannot work is worse than
+    saying nothing.
+    """
+    text = f"{type(exc).__name__} {exc}".lower()
+    if "ratelimit" in text or "429" in text or "quota" in text:
+        return (
+            "I've hit my limit for today, so I can't reply properly right "
+            "now. It resets in a few hours - I'll be here."
+        )
+    return "Something went wrong on my end. Give it another go in a moment."
+
+
 def _is_deflection(text: str) -> bool:
     """True if the message is a short brush-off like "nah I'm fine".
 
@@ -353,13 +371,29 @@ async def chat(
     user_msg = await repo.add_message(db, session.id, user_id, "user", message_text)
     user_message_id = user_msg.id
     provider = provider_factory.get_ai_provider()
-    reply = await provider.generate_reply(
-        message_text,
-        history=history,
-        memory_context=memory_context,
-        personality_context=personality_context,
-        tone_context=tone_context,
-    )
+    # Bug #113: this call used to be unguarded, so ANY provider failure
+    # became a bare 500 and the app showed "Sorry, I couldn't reach the
+    # server" - which is wrong and sends people to check their wifi. The
+    # server was reached perfectly; Groq's free tier had simply run out of
+    # its 200,000 tokens for the day. A quota wall and a network outage
+    # need different messages because they need different reactions.
+    try:
+        reply = await provider.generate_reply(
+            message_text,
+            history=history,
+            memory_context=memory_context,
+            personality_context=personality_context,
+            tone_context=tone_context,
+        )
+    except Exception as exc:
+        # The user's message was added above but nothing has committed yet,
+        # so roll it back rather than leaving a message with no reply
+        # stranded in their history.
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_provider_error_message(exc),
+        )
     # Enforce the gate on the reply itself. The prompt asks, this decides -
     # same defence-in-depth as markdown stripping (bug #94). Only the
     # stamped-on-the-end form is stripped; a quote the model wove into a
