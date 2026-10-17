@@ -1,10 +1,18 @@
 ﻿"""Chat + session history endpoints (all require a valid Supabase JWT)."""
 import asyncio
+import re
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai import provider_factory
 from app.ai.memory_extractor import extract_memories
+from app.ai.groq_provider import (
+    comfort_phrases_used,
+    has_quote,
+    quote_bank_block,
+    strip_repeated_comfort,
+    strip_trailing_quote,
+)
 from app.ai.mood_detector import detect_mood
 from app.auth.dependencies import get_current_user_id
 from app.db.session import get_db
@@ -29,7 +37,53 @@ router = APIRouter()
 # How many recent messages of the CURRENT chat to feed back to the AI.
 HISTORY_LIMIT = 20
 
+# Mood words that count as 'low'. Module level because both the tone
+# register and the quote gate below read them.
+LOW_MOODS = {"sad", "anxious", "stressed", "lonely", "angry", "tired"}
+UP_MOODS = {"happy", "excited", "grateful"}
+
+# A quote is only ever offered when someone is genuinely low, not merely
+# a bit off (bug #106). 4/5 is a deliberately high bar.
+QUOTE_MIN_INTENSITY = 4
+
+# ...and not on the opening message either. A line lands once you have
+# actually heard someone out; leading with one is a greetings card. Two
+# prior replies means the third exchange at the earliest.
+QUOTE_MIN_REPLIES = 2
+
+# Short brush-offs. On their own these are nothing; said while the mood
+# detector still reads low, they are the "I'm fine" that is not fine.
+DEFLECTIONS = {
+    "fine", "im fine", "i am fine", "im ok", "i am ok", "im okay",
+    "i am okay", "all good", "its fine", "it is fine", "its ok",
+    "it is ok", "its okay", "it is okay", "nothing", "nvm", "never mind",
+    "nevermind", "forget it", "doesnt matter", "does not matter", "nah",
+    "nah im fine", "nah im ok", "whatever", "idk", "nothing much",
+    "im good", "i am good", "no im fine", "its nothing", "it is nothing",
+}
+
+# Only treat a message as a brush-off if it is SHORT. A long message that
+# happens to contain "fine" is the user actually talking.
+DEFLECTION_MAX_WORDS = 5
+
 # Personality-mode instruction blocks (Phase 3B). "balanced" adds nothing.
+def _is_deflection(text: str) -> bool:
+    """True if the message is a short brush-off like "nah I'm fine".
+
+    Punctuation and case are stripped so "I'm fine." and "im fine"
+    both match. Nothing is inferred from this alone - the caller also
+    requires a low mood reading and an existing conversation.
+    """
+    # Apostrophes are DELETED, not spaced - otherwise "I'm" becomes
+    # "i m" and never matches. Other punctuation becomes a space.
+    lowered = re.sub(r"[’']", "", (text or "").lower())
+    cleaned = re.sub(r"[^a-z0-9 ]+", " ", lowered)
+    cleaned = " ".join(cleaned.split())
+    if not cleaned or len(cleaned.split()) > DEFLECTION_MAX_WORDS:
+        return False
+    return cleaned in DEFLECTIONS
+
+
 PERSONALITY_PROMPTS = {
     "motivator": (
         "Personality mode: MOTIVATOR. Be upbeat and encouraging. Cheer the user on and "
@@ -175,15 +229,15 @@ async def chat(
         # swing between banter and quiet presence is the whole point of the
         # companion, so the mood decides it explicitly rather than leaving the
         # model to guess.
-        low = {"sad", "anxious", "stressed", "lonely", "angry", "tired"}
-        up = {"happy", "excited", "grateful"}
+        low = LOW_MOODS
+        up = UP_MOODS
         if mood_reading.mood in low and mood_reading.intensity >= 3:
             register = (
                 "They are genuinely low right now. No jokes, no teasing, no silver "
-                "linings. Acknowledge the specific thing they said and stay with it. "
-                "A short, simple, widely known line may fit at the end if it lands "
-                "naturally - but only if you are not also giving advice, and not if "
-                "you used one recently."
+                "linings. Acknowledge the specific thing they said and stay with it, "
+                "in your own words. If they asked you for something concrete, give "
+                "it to them properly - being low does not mean they want to be "
+                "comforted instead of answered."
             )
         elif mood_reading.mood in low:
             register = (
@@ -207,6 +261,94 @@ async def chat(
             "Never state or imply that you detected their mood."
         )
 
+    # --- QUOTE GATE (bugs #105/#106) ---
+    # The owner's ask: a quote should be a rare moment that genuinely lands
+    # when someone is really low - not a decoration on every reply, and not
+    # on a fixed rota either. A model cannot honour a frequency rule (it has
+    # no memory of how often it has done something), so frequency is decided
+    # here, where it can actually be counted.
+    #
+    # Three conditions, all required:
+    #   1. they are genuinely low, not just a bit off
+    #   2. you have actually heard them out first, not opened with a line
+    #   3. no quote has appeared anywhere in this conversation yet
+    # history is the last HISTORY_LIMIT messages, so (3) works out at roughly
+    # one quote per ten exchanges - rare, which is the point.
+    #
+    # When the gate opens the model is handed QUOTE_BANK rather than being
+    # asked to recall a quote, because recalling is what made it invent them.
+    prior_replies = [m for m in history if m.get("role") == "assistant"]
+    already_quoted = any(has_quote(m["content"]) for m in prior_replies)
+    deeply_low = bool(
+        mood_reading
+        and mood_reading.mood in LOW_MOODS
+        and mood_reading.intensity >= QUOTE_MIN_INTENSITY
+    )
+    quote_allowed = (
+        deeply_low
+        and not already_quoted
+        and len(prior_replies) >= QUOTE_MIN_REPLIES
+    )
+    if quote_allowed:
+        quote_rule = (
+            "They are really low and you have been talking a while, so this "
+            "is one of the rare moments where a line genuinely lands. Pick the "
+            "one from the list below that actually fits what THEY are going "
+            "through - not a generic one - and work it into your sentence the "
+            "way a person does: say it brought something to mind, give the "
+            "line, then say in your own words why it fits them right now. "
+            "Do NOT open the reply with the bare line and do NOT stamp it on "
+            "the end on its own - it has to arrive mid-thought, the way a "
+            "person remembers something. If nothing on the list genuinely "
+            "fits them, use none."
+            + "\n\n"
+            + quote_bank_block()
+        )
+    else:
+        quote_rule = (
+            "Do NOT use a quote, a proverb, or any well-known saying in this "
+            "reply - not in quotation marks and not woven into a sentence "
+            "either. Speak entirely in your own words."
+        )
+    tone_context = (
+        tone_context + "\n\n" + quote_rule if tone_context else quote_rule
+    )
+
+    # --- 'I'M FINE' (bug #109) ---
+    # A short brush-off while the mood detector still reads low is the
+    # clearest emotional-intelligence signal available, and it is a
+    # mismatch between two things the server already knows - so it is
+    # decided here rather than hoped for in the prompt. Requires an
+    # existing conversation: an opening 'nothing' is just an opening.
+    if deeply_low and prior_replies and _is_deflection(message_text):
+        nudge = (
+            "They just brushed you off with a short answer, but nothing "
+            "else about this conversation says they are fine. Gently call "
+            "that - once, lightly, the way a friend does: say they do not "
+            "really sound fine and ask what happened. Do NOT announce that "
+            "you noticed a mood, do not psychoanalyse them, and do not "
+            "offer to listen or say you are here - just ask."
+        )
+        tone_context = tone_context + "\n\n" + nudge
+
+    # --- DON'T REPEAT YOURSELF (bug #110) ---
+    # The original complaint was never that warm lines are bad - said once
+    # and meant they are exactly right. It is that the same one arrived in
+    # every single reply until it stopped meaning anything. Banning the
+    # phrases outright was the wrong fix: it left the companion answering
+    # real pain with 'damn, that sucks'. So the words stay available and
+    # only the REPEAT is prevented, here, where it can be counted.
+    spent = comfort_phrases_used(m["content"] for m in prior_replies)
+    if spent:
+        used = "; ".join('"%s"' % p for p in spent[:6])
+        tone_context = tone_context + "\n\n" + (
+            "You have ALREADY used these lines earlier in this "
+            "conversation: " + used + ". Do not use any of them again - "
+            "repeating them makes you sound like a script. Say it in "
+            "different words, or say something more specific to them "
+            "instead."
+        )
+
     # Save the user's message, then generate a reply with full context.
     user_msg = await repo.add_message(db, session.id, user_id, "user", message_text)
     user_message_id = user_msg.id
@@ -218,6 +360,17 @@ async def chat(
         personality_context=personality_context,
         tone_context=tone_context,
     )
+    # Enforce the gate on the reply itself. The prompt asks, this decides -
+    # same defence-in-depth as markdown stripping (bug #94). Only the
+    # stamped-on-the-end form is stripped; a quote the model wove into a
+    # sentence is not trailing, so a naturally-told one survives on the rare
+    # turns where it is allowed.
+    if not quote_allowed:
+        reply = strip_trailing_quote(reply)
+    # Same story for a comfort line it has already spent: the prompt asks,
+    # this decides. Only a tacked-on final sentence is removed.
+    if spent:
+        reply = strip_repeated_comfort(reply, spent)
     await repo.add_message(db, session.id, user_id, "assistant", reply)
     await repo.touch_session(db, session.id)
 
