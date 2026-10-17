@@ -47,7 +47,9 @@ were closed. Full detail in SECTION 5.
 Phases 1-5 are shipped and verified on the real APK. Phase 6 (attachments) is complete.
 A web version using Expo Web was built and deployed to Vercel in Section 19.**
 
-> **SECTION 19 is the NEWEST section and WINS over anything above it where they
+> **SECTION 24B is the NEWEST section** (SECTION 0 below is stale - it was
+> written when 19 was newest). Read 24 and 24B first. The text below WINS
+> over anything above it where they
 > conflict.** It covers the web version (Expo Web + Vercel deployment) and a
 > timing re-fix for the home-screen mic shortcut (#68). Read Section 19 first,
 > then come back here for stable reference material.
@@ -4380,3 +4382,163 @@ exists for exactly this and must be checked first.
     worse than vague.
 11. **Read the deploy logs.** cron-job.org's secret had been listed as
     unverifiable; one line of Render's own log settled it.
+
+---
+
+# SECTION 24B - Session 24 continued: #113 fixed twice, typing indicator, full audit
+
+> Written after SECTION 24. Everything here happened later in the same session
+> and **supersedes 24.12-24.17 where they differ**.
+
+## 24B.1 Bug #113 was "fixed" in a file nothing imports
+
+The 503 work in 24.13 went into `sendChatMessage` in `services/api.ts`.
+
+**`ChatScreen` does not call that function.** It calls
+`sendChatWithAttachments` in `services/attachments.ts`. `sendChatMessage` is
+**dead code - nothing in the app imports it.**
+
+So the fix shipped, deployed, and changed nothing. The owner sent the same
+screenshot again: *"bro still saying couldn't reach the server bro what you
+have done is ti because if vercel one we delete or what"* - he had even started
+suspecting the unrelated Vercel cleanup.
+
+**Two files hold near-identical chat request logic and only ONE is live.**
+Session 23's audit had already noticed them drifting apart over the 401 retry
+and nobody drew the obvious conclusion. `sendChatMessage` now carries a comment
+saying it is dead and pointing at the live one.
+
+**RULE: before fixing a behaviour, grep for who actually calls the function.**
+A deployed fix to dead code is indistinguishable from no fix at all, and costs
+a full build to discover.
+
+## 24B.2 Typing indicator (bug #114) - `components/TypingBubble.tsx` (NEW)
+
+The owner spotted it in a screenshot: the chat showed a plain italic
+*"Thinking..."* where the mockup had promised bouncing dots. It had been listed
+in that mockup as the highest-value, lowest-effort item on the page and then
+simply never built.
+
+Two faults. It was **static**, so during a two-second Groq call the app reads as
+frozen - which is how people end up re-sending. And it sat **below the message
+list, above the input**, nowhere near where the reply appears.
+
+Now rendered as the FlatList's `ListFooterComponent`: three dots bouncing in
+sequence inside an empty companion bubble with the same tail radius as a real
+one, so the reply lands exactly where the dots were. `transform` + `opacity`,
+`useNativeDriver` - no reanimated, no dev build.
+
+## 24B.3 End-to-end audit - what it proved and what it caught
+
+The owner asked for everything to be verified before he downloaded the APK.
+**63 checks, all passing.** Scripts are in the session scratchpad; the approach
+is worth repeating.
+
+**Proved:**
+
+- Every deterministic helper (`has_quote`, `strip_trailing_quote`,
+  `strip_repeated_comfort`, `comfort_phrases_used`, `used_bank_line`,
+  `_is_deflection`, `_provider_error_message`, `_clean`) behaves exactly as
+  specified, including the cases that must NOT fire.
+- **The real `/chat` route under a mocked 429** - via `TestClient` with auth,
+  DB and provider stubbed - returns **503**, a human `detail`, no vendor name,
+  no stack trace, and **rolls the user's message back** rather than stranding it
+  (which is why "What?" sat alone in the owner's screenshot).
+- **The mood query against the LIVE database**: valid SQL, outer join works,
+  rows serialise, and `created_at` comes back as
+  `2026-10-10T18:37:23.414680Z`. **That trailing `Z` is the timezone trap from
+  24.10 and it is confirmed safe** - JavaScript will parse it as UTC.
+- `tsc` clean, `expo-doctor` 18/18, no orphaned styles left by the removed
+  `Thinking...`, landing line or old centred greeting.
+
+**Caught three things:**
+
+1. **`instanceof ChatError` could have failed silently.** Subclassing `Error`
+   breaks `instanceof` when a bundler downlevels classes to ES5. Checked the
+   live web bundle - it emits native `class X extends Error{}` with no
+   `_inherits` helpers, and Hermes supports classes natively. Safe, but it was
+   luck rather than design. **If that ever changes, switch to a property flag
+   instead of `instanceof`.**
+2. **Shadowed variable** - `ChatScreen`'s catch block declared `const text`
+   inside a function whose own parameter is `text`. Block scope made it safe; it
+   read as a bug. Renamed `errorText`.
+3. **`pickQuestion()` used UTC.** `getTime()` alone rolled the home-screen
+   question over at **05:45 local in Nepal** instead of midnight. Now uses the
+   device's local day, matching `MoodWeek`.
+
+## 24B.4 Deployment reality - five APK builds in one session
+
+| Build | Contained | Outcome |
+|---|---|---|
+| `066dcbb8` | original | superseded |
+| `553ibGL…` | landing line removed | superseded |
+| `3163f7d2` | + #113 (the dead-code version) | **cancelled** |
+| `ebfd380c` | + typing dots | finished before it could be cancelled, superseded |
+| `93111c99` | + #113 in the LIVE function | good |
+| `3ba97080` | + the two audit cleanups | final |
+
+**Every one of those was a JavaScript-only change.** Six builds, 40-90 minutes
+each, to ship text and UI edits. This is the single strongest argument for
+`expo-updates` in 24B.6.
+
+`eas build:cancel <id>` works only while a build is still running; `ebfd380c`
+had already finished and the cancel returned `GraphQL request failed`.
+
+## 24B.5 Closed this session
+
+- **#104 stray Vercel `dist` project** - deleted by the owner.
+  `dist-six-chi-27.vercel.app` returns **404**, `saphinai.vercel.app` still
+  **200**. It had been serving a live, public, stale copy of the app from Oct 11
+  against the real backend and real user data - which was the actual reason to
+  remove it, not tidiness.
+- **cron-job.org's `CRON_SECRET`** - Render's own deploy log shows
+  `116.203.134.67 - "POST /internal/run-checkins HTTP/1.1" 200 OK`. A Hetzner
+  address, i.e. cron-job.org, getting 200 rather than 403. All three copies
+  agree.
+- **The landing "Free. No card. 30 seconds." line** - removed. "30 seconds" was
+  false: email confirmation is ON, so the real flow is fill the form, leave the
+  app, find the email, click, come back, log in. The owner asked for the line
+  gone rather than reworded.
+
+## 24B.6 Still outstanding - corrected and re-ranked
+
+- **RED: the app has no consistent name.** Unchanged from 24.16 and still the
+  biggest open item. 16 places say "Saphin AI" (including every backend email
+  and the push title), `LandingScreen` and `AuthScreen` say "Your Companion",
+  the home input says "Chat with Saphin...", the chat header says "Companion".
+  The owner was offered Saathi / Saphin / keep Saphin AI / Lamplight and
+  replied *"maybe later we will decide"*. **Do not apply a name without asking
+  him.**
+- **ORANGE: `expo-updates` is NOT installed.** Six builds this session for
+  JS-only changes. One rebuild installs it; after that JS ships in ~30s. The
+  owner has been told twice and has not said yes - **offer it with the next
+  build rather than acting on it.**
+- **ORANGE: nothing has been confirmed on a real device.** Six APKs built, none
+  tested. Beyond 23.16: typing dots appear and clear; the rate-limit message
+  reads *"I've hit my limit for today"* not *"couldn't reach the server"*; mood
+  dots open that day's conversations; voice Cancel is findable; dark theme now
+  follows the phone (#98).
+- **YELLOW: the four `docs/ui-mockup*.html` files were committed to the repo.**
+  This contradicts the standing instruction to deliver HTML as standalone files
+  **outside** the git repo. Flagged to the owner; awaiting his call on moving
+  them.
+- **YELLOW: #103** attachment files still orphaned in the bucket - a retention
+  decision, not a bug.
+- **YELLOW: signup friction.** Email confirmation is on and nothing prepares
+  the user for it. First place to look if signups are ever low.
+- Unchanged from 24.16: typography rollout, stale Expo Go push token row, FCM
+  key on the `production` profile, and the 23.14 carry-overs.
+
+## 24B.7 Rules
+
+1. **Grep for the caller before fixing a behaviour.** A deployed fix to dead
+   code looks exactly like no fix, and costs a build to find out.
+2. **Two files with near-identical logic will drift, and one of them is a
+   decoy.** Session 23 noticed `api.ts` and `attachments.ts` diverging and did
+   not act; Session 24 then patched the dead one.
+3. **A fix is not verified until the thing the user does is verified.** `tsc`,
+   unit tests and a successful deploy all passed while the bug was fully
+   present.
+4. **Ship the action, not the argument.** Twice this session the owner asked for
+   a rebuild and got a table explaining why it was not worth it. He asked again
+   both times.
